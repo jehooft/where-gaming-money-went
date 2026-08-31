@@ -1,0 +1,15 @@
+# Third-party research material — downloaded during research, NOT redistributed.
+# These are other people's reports (Newzoo, Nintendo IR) and wiki exports. Every URL
+# is listed in research/RESEARCH-NOTES.md if you want to fetch them again yourself.
+research/sources/
+
+# Tooling / editor
+.claude/
+.vscode/
+.idea/
+node_modules/
+
+# OS junk
+.DS_Store
+Thumbs.db
+desktop.ini

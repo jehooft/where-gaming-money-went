@@ -1,0 +1,60 @@
+# Publishes the chart to GitHub Pages on every push to the default branch.
+#
+# One-time setup in the repo: Settings → Pages → Build and deployment →
+# Source: "GitHub Actions". Nothing else to configure; the site is static.
+
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Let a running deploy finish rather than cancelling it mid-publish.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # Rebuilds data/gaming-revenue.{js,json} from the source data modules, so a
+      # committed data file can never drift from the research it came from.
+      - name: Rebuild dataset
+        run: node data/build.mjs
+
+      - name: Fail if the committed dataset was stale
+        run: |
+          if ! git diff --quiet -- data/gaming-revenue.js data/gaming-revenue.json; then
+            echo "::error::data/gaming-revenue.* is out of date. Run 'node data/build.mjs' and commit the result."
+            git --no-pager diff --stat -- data/gaming-revenue.js data/gaming-revenue.json
+            exit 1
+          fi
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: '.'
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

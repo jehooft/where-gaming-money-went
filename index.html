@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Where Gaming's Money Went — 1970–2026</title>
+<meta name="description" content="An interactive streamgraph of worldwide video game revenue by platform, company and console, every quarter from 1970 to 2026.">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<header class="masthead">
+  <div class="masthead-inner">
+    <div class="brandmark" aria-hidden="true">
+      <span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+    </div>
+    <div>
+      <h1>Where gaming's<br><span class="hl">money went</span></h1>
+      <p class="deck">
+        Fifty-six years of player spending &middot; 1970&ndash;2026 &middot; worldwide
+        <span class="deck-sep">/</span>
+        <span id="basis-label">inflation-adjusted to 2025 US dollars</span>
+      </p>
+    </div>
+  </div>
+</header>
+
+<main class="layout">
+
+  <!-- ------------------------------------------------------- left rail -->
+  <aside class="rail" id="rail">
+    <div class="card intro">
+      <p>From the arcade boom to home consoles, PC gaming and the phone in your pocket &mdash;
+      who actually took the money, and when.</p>
+      <p class="intro-cta">Click a band to break it open:
+      <b>segment &rarr; company &rarr; individual platform</b>. Scroll over the chart to zoom
+      the years. Click empty space to close everything.</p>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h2>Segments</h2>
+        <button class="linkbtn" id="collapse-all" type="button">Collapse all</button>
+      </div>
+      <ul class="legend" id="legend"></ul>
+      <button class="linkbtn showall" id="show-all" type="button" hidden>Show all</button>
+      <p class="legend-hint">The eye icon removes a segment from the chart completely, so it
+      stops counting towards the total.</p>
+    </div>
+
+    <div class="card" id="detail-card" hidden>
+      <div class="card-head">
+        <h2 id="detail-title">&mdash;</h2>
+        <button class="linkbtn" id="detail-close" type="button">Close</button>
+      </div>
+      <div id="detail-body"></div>
+    </div>
+
+    <div class="card ranks">
+      <div class="card-head">
+        <h2>Biggest bands, <span id="rank-period">2026</span></h2>
+      </div>
+      <ol class="ranklist" id="ranklist"></ol>
+    </div>
+  </aside>
+
+  <!-- ------------------------------------------------------- chart -->
+  <section class="chartwrap">
+    <div class="toolbar" role="group" aria-label="Chart controls">
+      <div class="tb-group">
+        <span class="tb-label">Shape</span>
+        <div class="seg" data-control="offset">
+          <button type="button" data-value="wiggle" class="on">Stream</button>
+          <button type="button" data-value="silhouette">Centred</button>
+          <button type="button" data-value="zero">Stacked</button>
+          <button type="button" data-value="expand">Share</button>
+        </div>
+      </div>
+      <div class="tb-group">
+        <span class="tb-label">Resolution</span>
+        <div class="seg" data-control="resolution">
+          <button type="button" data-value="annual" class="on">Annual</button>
+          <button type="button" data-value="quarterly">Quarterly</button>
+        </div>
+      </div>
+      <div class="tb-group">
+        <span class="tb-label">Dollars</span>
+        <div class="seg" data-control="dollars">
+          <button type="button" data-value="real" class="on">Real (2025&nbsp;$)</button>
+          <button type="button" data-value="nominal">Nominal</button>
+        </div>
+      </div>
+      <div class="tb-group">
+        <label class="check"><input type="checkbox" id="show-notes" checked> Story notes</label>
+        <label class="check"><input type="checkbox" id="show-labels" checked> Band labels</label>
+      </div>
+      <div class="tb-group tb-right">
+        <button type="button" class="ghostbtn" id="theme-toggle">Light</button>
+        <button type="button" class="linkbtn" id="open-method">Method &amp; sources</button>
+      </div>
+    </div>
+
+    <nav class="crumbs" id="crumbs" aria-label="Drill-down state"></nav>
+
+    <div class="stage" id="stage">
+      <svg id="chart" role="img" aria-label="Streamgraph of worldwide video game revenue by platform, 1970 to 2026"></svg>
+      <div class="tooltip" id="tooltip" hidden></div>
+    </div>
+
+    <div class="rangebar">
+      <label for="range-from">From</label>
+      <input type="range" id="range-from" min="1970" max="2026" value="1970" step="1">
+      <output id="range-from-out">1970</output>
+      <label for="range-to">to</label>
+      <input type="range" id="range-to" min="1970" max="2026" value="2026" step="1">
+      <output id="range-to-out">2026</output>
+      <button type="button" class="linkbtn" id="range-reset">Reset</button>
+    </div>
+  </section>
+</main>
+
+<!-- ------------------------------------------------------- methodology -->
+<dialog id="method" class="method">
+  <button type="button" class="dialog-close" id="method-close" aria-label="Close">&times;</button>
+  <h2>How this chart was built</h2>
+
+  <p><b>What is being counted.</b> Worldwide <em>consumer</em> spending on video games: coin
+  dropped into arcade machines, software bought at retail or digitally, DLC, subscriptions and
+  in-app purchases. Business-to-business revenue &mdash; arcade cabinets sold to operators, engine
+  licences, advertising, esports sponsorship &mdash; is excluded, because counting it alongside
+  player spending would double-count the same dollar.</p>
+
+  <p><b>Hardware is included, but only dedicated games hardware.</b> Consoles, handhelds and VR
+  headsets count; gaming PCs, graphics cards and phones do not, because those are general-purpose
+  machines and their buyers are not only buying a games device. This is why the totals here run
+  above Newzoo's widely-quoted headline: Newzoo counts content only. 2024 reads as roughly
+  $207bn here versus their $182.7bn, and about $15bn of that gap is console and handheld hardware.
+  It also means a console band spikes in its launch quarter, which is exactly the behaviour you
+  want to see on a chart about hardware generations.</p>
+
+  <p><b>How the bands are cut.</b> The three levels are segment &rarr; company &rarr; platform, but
+  "company" means something slightly different per segment, and it has to:</p>
+  <ul>
+    <li><b>Console &amp; handheld</b> &mdash; by platform holder. A band is <em>all</em> money spent
+    on that ecosystem, including games from other publishers. PlayStation 4 includes Call of Duty.</li>
+    <li><b>PC</b> &mdash; by <em>storefront</em>. An EA game bought on Steam counts as Steam. This is
+    the only way to slice PC without counting the same sale twice.</li>
+    <li><b>Mobile</b> &mdash; by publisher, which is naturally exclusive since each game has one.</li>
+    <li><b>Arcade</b> &mdash; by the manufacturer of the machine that took the coin.</li>
+    <li><b>VR / Cloud</b> &mdash; by platform owner.</li>
+  </ul>
+
+  <p><b>Where the numbers come from.</b> Annual segment totals are the spine and are researched
+  directly: Play Meter and Vending Times arcade surveys for the 1970s&ndash;80s; NPD/Circana and
+  Gaming Alexandria's compilation of contemporaneous trade estimates for US retail 1972&ndash;1999;
+  Capcom, Sega Sammy and JAMMA filings for the Japanese arcade market; DFC Intelligence for PC;
+  Newzoo, Sensor Tower and company filings from 2012 on. Every platform band is then rescaled so
+  each segment-year sums <em>exactly</em> to those researched totals.</p>
+
+  <p><b>Platform shapes are derived, not guessed.</b> Console and handheld bands are computed from
+  hardware shipment curves &mdash; lifetime unit totals are matters of record, and the yearly split
+  follows published shipment data &mdash; plus software attach and a live-service multiplier that
+  grows over time as DLC and microtransactions take over.</p>
+
+  <p class="warn"><b>What is modelled rather than measured.</b> There is no public quarterly series
+  for this industry before roughly 2010, and none at all for arcades or pre-1995 console markets.
+  Quarterly values here are the researched annual figure distributed using segment- and era-specific
+  seasonality &mdash; heavily holiday-weighted for retail-era consoles, nearly flat for mobile and
+  subscriptions &mdash; with launch quarters handled explicitly, so the PS5 contributes nothing
+  before Q4&nbsp;2020. <b>That seasonality is exactly why the quarterly view has a regular
+  sawtooth: it is a modelling assumption, not a measurement.</b> Use the annual view for anything
+  that matters. Pre-1985 figures and arcade figures after 1990 are the least certain numbers on
+  the chart.</p>
+
+  <p><b>Where this deliberately differs from other published versions.</b> The best-known chart of
+  this shape shows arcade revenue collapsing to nothing after the mid-1980s, which is true of the
+  United States and not of Japan, where arcade operating revenue was still a multi-billion-dollar
+  business through the 2010s. The arcade band here stays visible, restricted to the video-game
+  share of arcade operating revenue.</p>
+
+  <p><b>Inflation.</b> "Real" figures use US CPI-U annual averages, rebased to 2025 dollars.
+  2026 is a forecast year in every segment.</p>
+
+  <p class="muted">Full working, source list and per-year notes:
+  <code>research/RESEARCH-NOTES.md</code>. Data model: <code>data/segments.mjs</code>,
+  <code>data/platforms.mjs</code>, <code>data/events.mjs</code>; rebuild with
+  <code>node data/build.mjs</code>.</p>
+</dialog>
+
+<div class="note-pop" id="note-pop" hidden>
+  <button type="button" class="note-close" aria-label="Close">&times;</button>
+  <h3 id="note-title"></h3>
+  <p id="note-text"></p>
+</div>
+
+<script src="data/gaming-revenue.js"></script>
+<script src="js/stream.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
