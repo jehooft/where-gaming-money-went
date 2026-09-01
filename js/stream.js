@@ -101,7 +101,7 @@ function stack(values, order, offset = 'wiggle') {
 /**
  * Catmull-Rom through the points, emitted as cubic beziers. `tension` 0 = very
  * smooth, 1 = polyline. Used so the ribbon reads as a flowing shape rather than
- * a bar chart, which matters a lot in quarterly mode.
+ * a bar chart.
  */
 function splineTo(pts, tension = 0.35) {
   if (pts.length < 2) return '';

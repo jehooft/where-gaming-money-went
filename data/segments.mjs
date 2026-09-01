@@ -95,20 +95,9 @@ export const CONFIDENCE = {
   ],
 };
 
-// Seasonality: fraction of the calendar year's revenue landing in Q1..Q4.
-// Console/handheld shift from a heavily holiday-weighted retail pattern to a flatter
-// live-service pattern as digital and in-game spending take over.
-export const SEASONALITY = {
-  arcade:   () => [0.24, 0.25, 0.27, 0.24],
-  cloud:    () => [0.25, 0.25, 0.25, 0.25],
-  mobile:   () => [0.26, 0.24, 0.24, 0.26],
-  pc:       (y) => (y < 2005 ? [0.22, 0.20, 0.22, 0.36] : [0.24, 0.24, 0.22, 0.30]),
-  vr:       () => [0.20, 0.18, 0.20, 0.42],
-  console:  (y) => (y < 2010 ? [0.19, 0.17, 0.20, 0.44]
-                  : y < 2016 ? [0.20, 0.19, 0.21, 0.40]
-                             : [0.22, 0.21, 0.22, 0.35]),
-  handheld: (y) => (y < 2010 ? [0.18, 0.17, 0.20, 0.45] : [0.20, 0.19, 0.21, 0.40]),
-};
+// (A SEASONALITY table lived here when the chart had a quarterly view. It was removed
+// along with that view: no public quarterly series exists for this industry before about
+// 2010, so the table was one assumption repeated 57 times rather than a measurement.)
 
 // US CPI (annual average, 1982-84 = 100), used for the inflation-adjusted view.
 // Source: US Bureau of Labor Statistics, CPI-U, All Urban Consumers.

@@ -112,6 +112,7 @@ export const HARDWARE = [
     id: 'odyssey2', label: 'Magnavox Odyssey²', company: 'magnavox', segment: 'console',
     launchQ: 3, hwPrice: 179, hwDecay: 0.82, swUnits: 8, swPrice: 25,
     units: yrs(1978, [0.15, 0.35, 0.5, 0.5, 0.35, 0.15]),
+    note: 'Released in 1978 as Magnavox\'s cartridge-based successor to the Odyssey, and sold in Europe as the Philips Videopac G7000. Its built-in membrane keyboard was intended to position it as an educational device as well as a games console. It sold roughly two million units, and performed considerably better in Europe and Brazil than in the United States.',
   },
   {
     id: 'intellivision', label: 'Mattel Intellivision', company: 'mattel', segment: 'console',
@@ -123,6 +124,7 @@ export const HARDWARE = [
     id: 'atari-5200', label: 'Atari 5200', company: 'atari', segment: 'console',
     launchQ: 4, hwPrice: 269, hwDecay: 0.7, swUnits: 4, swPrice: 30,
     units: yrs(1982, [0.25, 0.6, 0.15]),
+    note: 'Released in 1982 as Atari\'s intended successor to the 2600. Its non-centring analogue controllers proved unreliable, it was not backward compatible at launch, and it arrived directly into the downturn that became the crash of 1983. Production ended in 1984 after roughly one million units.',
   },
   {
     id: 'colecovision', label: 'ColecoVision', company: 'coleco', segment: 'console',
@@ -134,6 +136,7 @@ export const HARDWARE = [
     id: 'vectrex-etc', label: 'Vectrex & other 2nd-gen', company: 'other', segment: 'console',
     launchQ: 4, hwPrice: 199, hwDecay: 0.7, swUnits: 3, swPrice: 28,
     units: yrs(1982, [0.2, 0.35, 0.1]),
+    note: 'A group of short-lived second-generation systems, chief among them the Vectrex (1982), which was unique in shipping with its own built-in vector monitor rather than connecting to a television. Vector displays gave sharp, bright lines that raster consoles could not reproduce, but the format was expensive and the machine was discontinued in 1984.',
   },
 
   // ---------- third generation ----------
@@ -153,6 +156,7 @@ export const HARDWARE = [
     id: 'sg1000', label: 'Sega SG-1000 / Mark III', company: 'sega', segment: 'console',
     launchQ: 3, hwPrice: 135, hwDecay: 0.85, swUnits: 6, swPrice: 28,
     units: yrs(1983, [0.4, 0.7, 0.6, 0.3]),
+    note: 'Sega\'s first home console, released in Japan on 15 July 1983 — the same day as the Nintendo Famicom, which comprehensively outsold it. Its revised form, the Mark III, became the basis for the Master System sold internationally from 1986.',
   },
 
   // ---------- fourth generation ----------
@@ -166,6 +170,7 @@ export const HARDWARE = [
     id: 'snes', label: 'Super Nintendo (SNES)', company: 'nintendo', segment: 'console',
     launchQ: 4, hwPrice: 199, hwDecay: 0.92, swUnits: 379, swPrice: 46,
     units: yrs(1990, [1.7, 4.5, 7.5, 8.0, 8.5, 7.0, 5.0, 3.5, 2.0, 1.0, 0.4]),
+    note: 'Released in 1990 in Japan and 1991 elsewhere, the Super Nintendo sold 49.1 million units and 379 million games. Its Mode 7 hardware scaling and rotation defined the visual style of the era, and its cartridges could carry co-processors — the Super FX chip in Star Fox effectively added 3D hardware to a 16-bit machine.',
   },
   {
     id: 'pce', label: 'PC Engine / TurboGrafx-16', company: 'nec', segment: 'console',
@@ -183,6 +188,7 @@ export const HARDWARE = [
     id: 'segacd', label: 'Sega CD & 32X', company: 'sega', segment: 'console',
     launchQ: 4, hwPrice: 249, hwDecay: 0.72, swUnits: 12, swPrice: 45,
     units: yrs(1992, [0.35, 0.85, 1.1, 0.6, 0.15]),
+    note: 'Two add-ons for the Mega Drive: the Sega CD (1992), which brought CD-ROM storage and full-motion video, and the 32X (1994), a stopgap 32-bit upgrade released a year before the Saturn. Neither sold well, and together they are generally regarded as having fragmented Sega\'s platform and its developer base at a critical moment.',
   },
   {
     id: 'cdi-3do', label: 'CD-i, 3DO & CD32', company: 'panasonic', segment: 'console',
@@ -228,6 +234,7 @@ export const HARDWARE = [
     id: 'gamecube', label: 'Nintendo GameCube', company: 'nintendo', segment: 'console',
     launchQ: 3, hwPrice: 199, hwDecay: 0.85, swUnits: 208, swPrice: 43,
     units: yrs(2001, [3.5, 6.5, 4.5, 3.5, 2.5, 1.0, 0.25]),
+    note: 'Released in 2001, the GameCube sold 21.7 million units — Nintendo\'s weakest home console until the Wii U. It used proprietary 8 cm optical discs, which limited piracy but also capacity, and it shipped without DVD playback at a time when the PlayStation 2 was doubling as a household DVD player.',
   },
   {
     id: 'xbox', label: 'Xbox', company: 'microsoft', segment: 'console',
@@ -319,6 +326,7 @@ export const HARDWARE = [
     id: 'lynx', label: 'Atari Lynx', company: 'atari', segment: 'handheld',
     launchQ: 3, hwPrice: 179, hwDecay: 0.8, swUnits: 4, swPrice: 35,
     units: yrs(1989, [0.15, 0.4, 0.5, 0.4, 0.3, 0.2, 0.05]),
+    note: 'Released by Atari in 1989, the Lynx was the first handheld games console with a colour backlit LCD, and could be held in either orientation for left-handed players. Its battery life of roughly four to five hours and comparatively high price left it far behind the Game Boy, and it sold on the order of two million units.',
   },
   {
     id: 'gamegear', label: 'Sega Game Gear', company: 'sega', segment: 'handheld',
@@ -330,11 +338,13 @@ export const HARDWARE = [
     id: 'ngpc-ws', label: 'Neo Geo Pocket & WonderSwan', company: 'other', segment: 'handheld',
     launchQ: 4, hwPrice: 69, hwDecay: 0.85, swUnits: 11, swPrice: 25,
     units: yrs(1998, [0.4, 1.6, 1.7, 1.0, 0.5, 0.2]),
+    note: 'Two late attempts to compete with Nintendo in handhelds. SNK\'s Neo Geo Pocket Color (1999) had a well-regarded microswitched thumbstick and strong fighting games; Bandai\'s WonderSwan (1999), designed by Game Boy creator Gunpei Yokoi, ran for around 30 hours on a single AA battery. Both were confined largely to Japan and were discontinued by 2003.',
   },
   {
     id: 'gba', label: 'Game Boy Advance', company: 'nintendo', segment: 'handheld',
     launchQ: 1, hwPrice: 99, hwDecay: 0.92, swUnits: 377, swPrice: 30,
     units: yrs(2001, [11.0, 16.5, 14.5, 15.5, 12.0, 7.5, 3.5, 1.0]),
+    note: 'Released in 2001, the Game Boy Advance sold 81.5 million units and 377 million games. It was backward compatible with the entire Game Boy library, and its original model shipped without a backlit screen — a limitation corrected by the Game Boy Advance SP in 2003.',
   },
   {
     id: 'ngage', label: 'Nokia N-Gage', company: 'nokia', segment: 'handheld',
@@ -429,6 +439,7 @@ export const ENTITIES = [
     id: 'arc-snk', label: 'SNK (arcade)', company: 'snk', segment: 'arcade',
     rev: yrs(1985, [30, 60, 100, 160, 240, 380, 520, 620, 700, 720, 660, 580, 480, 380, 300, 240, 190, 150, 110, 80, 55, 35, 20]),
     titles: ['Ikari Warriors (1986)', 'Fatal Fury (1991)', 'The King of Fighters (1994)', 'Metal Slug (1996)'],
+    note: 'SNK built its arcade business on the Neo Geo MVS, a multi-slot cabinet system introduced in 1990 that let operators stock up to six games in one machine and swap them without buying new hardware. The same architecture was sold to consumers as the Neo Geo AES, making arcade-identical home conversions possible for the first time.',
   },
   {
     id: 'arc-other', label: 'Other arcade makers', company: 'other', segment: 'arcade',
@@ -473,6 +484,7 @@ export const ENTITIES = [
     id: 'pc-netease-pc', label: 'NetEase — China PC', company: 'netease', segment: 'pc',
     rev: yrs(2003, [40, 110, 200, 300, 420, 560, 720, 900, 1080, 1250, 1400, 1550, 1650, 1700, 1700, 1680, 1700, 1800, 1900, 1880, 1850, 1900, 1980, 2050]),
     titles: ['Fantasy Westward Journey (2003)', 'World of Warcraft CN (2009-2023)', 'Naraka: Bladepoint (2021)'],
+    note: 'NetEase built its PC business on domestically developed MMORPGs, principally the Westward Journey series, and on operating foreign titles inside China under licence — most prominently World of Warcraft, which it ran from 2009 until the licensing agreement with Blizzard lapsed in January 2023 and resumed in 2024.',
   },
   {
     id: 'pc-riot', label: 'Riot — Riot client', company: 'riot', segment: 'pc',
@@ -539,6 +551,7 @@ export const ENTITIES = [
     id: 'mob-netease', label: 'NetEase (mobile)', company: 'netease', segment: 'mobile',
     rev: yrs(2013, [180, 700, 1600, 2600, 3400, 3900, 4200, 4900, 5400, 5200, 5000, 5300, 5500, 5700]),
     titles: ['Fantasy Westward Journey Mobile', 'Identity V (2018)', 'Knives Out (2017)'],
+    note: 'NetEase is the second-largest games company in China after Tencent. Its mobile portfolio spans domestic RPGs, the asymmetric horror game Identity V, and battle-royale titles, and it has invested heavily in overseas studios since the late 2010s in an effort to reduce its dependence on the Chinese regulatory environment.',
   },
   {
     id: 'mob-niantic', label: 'Niantic', company: 'niantic', segment: 'mobile',
@@ -556,6 +569,7 @@ export const ENTITIES = [
     id: 'mob-roblox', label: 'Roblox (mobile)', company: 'roblox', segment: 'mobile',
     rev: yrs(2018, [280, 450, 950, 1350, 1500, 1800, 2200, 2600, 2900]),
     titles: ['Roblox (2006; iOS 2012, Android 2014)'],
+    note: 'Roblox is a platform rather than a single game: users create the experiences and Roblox takes a share of the in-platform currency, Robux, spent inside them. Launched in 2006 and on mobile from 2012, it derives the majority of its bookings from phones and tablets, and reports a player base skewing heavily towards under-16s.',
   },
   {
     id: 'mob-zynga', label: 'Zynga / Take-Two', company: 'zynga', segment: 'mobile',
@@ -567,21 +581,25 @@ export const ENTITIES = [
     id: 'mob-playrix', label: 'Playrix', company: 'playrix', segment: 'mobile',
     rev: yrs(2016, [180, 450, 1100, 1800, 2300, 2600, 2500, 2400, 2350, 2300, 2250]),
     titles: ['Gardenscapes (2016)', 'Homescapes (2017)', 'Fishdom'],
+    note: 'Founded in Vologda, Russia in 2004 and later headquartered in Ireland, Playrix built one of the largest mobile publishers in the world on the "meta-game" pattern: a match-three puzzle core wrapped in a home-renovation or garden-restoration narrative. Gardenscapes (2016) and Homescapes (2017) established the template, which has been widely imitated.',
   },
   {
     id: 'mob-ea', label: 'EA (mobile)', company: 'ea', segment: 'mobile',
     rev: yrs(2008, [180, 280, 380, 480, 560, 620, 680, 720, 760, 800, 850, 900, 1000, 1100, 1150, 1150, 1200, 1250, 1300]),
     titles: ['The Sims FreePlay', 'FIFA Mobile', 'Star Wars: Galaxy of Heroes (2015)'],
+    note: 'Electronic Arts entered mobile through its 2005 acquisition of Jamdat and now operates a portfolio built largely on its sports and Star Wars licences. Its mobile business is smaller than its console and PC operations but considerably more stable, with several titles earning steadily for a decade or more.',
   },
   {
     id: 'mob-scopely', label: 'Scopely', company: 'scopely', segment: 'mobile',
     rev: yrs(2019, [400, 700, 1000, 1200, 1500, 2200, 2600, 2800]),
     titles: ['Monopoly Go! (2023)', 'Stumble Guys', 'Pokémon GO (from 2025)'],
+    note: 'A Los Angeles publisher specialising in licensed mobile titles, acquired by Savvy Games Group — owned by Saudi Arabia\'s Public Investment Fund — for $4.9 billion in 2023. Its Monopoly Go, launched that year, became one of the fastest titles ever to pass $3 billion in player spending. Scopely acquired Niantic\'s games business, including Pokémon GO, in 2025.',
   },
   {
     id: 'mob-nintendo', label: 'Nintendo (mobile)', company: 'nintendo', segment: 'mobile',
     rev: yrs(2016, [280, 380, 420, 400, 380, 340, 300, 260, 240, 220, 200]),
     titles: ['Super Mario Run (2016)', 'Fire Emblem Heroes (2017)', 'Pokémon-adjacent titles'],
+    note: 'Nintendo resisted mobile publishing for years before releasing Miitomo and Super Mario Run in 2016. Its mobile revenue has remained modest by industry standards and appears to be treated primarily as brand promotion for its hardware, with several titles discontinued after short runs.',
   },
   {
     id: 'mob-sea', label: 'Sea / Garena', company: 'sea', segment: 'mobile',
@@ -593,6 +611,7 @@ export const ENTITIES = [
     id: 'mob-moonactive', label: 'Moon Active', company: 'moonactive', segment: 'mobile',
     rev: yrs(2017, [150, 400, 900, 1200, 1300, 1250, 1200, 1250, 1300, 1300]),
     titles: ['Coin Master (2015)'],
+    note: 'An Israeli publisher whose single dominant title, Coin Master, combines a slot-machine mechanic with village-building and social raiding. Its monetisation has drawn regulatory scrutiny in several jurisdictions over the resemblance between its core loop and gambling.',
   },
   {
     id: 'mob-dreamgames', label: 'Dream Games', company: 'dreamgames', segment: 'mobile',
@@ -604,6 +623,7 @@ export const ENTITIES = [
     id: 'mob-netmarble', label: 'Netmarble', company: 'netmarble', segment: 'mobile',
     rev: yrs(2014, [500, 800, 1100, 1500, 1400, 1350, 1600, 1700, 1600, 1550, 1600, 1650, 1700]),
     titles: ['Lineage 2: Revolution (2016)', 'Marvel Future Fight (2015)'],
+    note: 'One of the largest Korean mobile publishers, listed in Seoul since 2017. It has grown substantially through licensing — operating mobile adaptations of Korean MMO franchises such as Lineage, and of Western properties including Marvel — and through the acquisition of overseas studios.',
   },
   {
     id: 'mob-aniplex', label: 'Aniplex (Sony)', company: 'aniplex', segment: 'mobile',
@@ -615,11 +635,13 @@ export const ENTITIES = [
     id: 'mob-krafton', label: 'Krafton', company: 'krafton', segment: 'mobile',
     rev: yrs(2021, [600, 800, 900, 1000, 1050, 1100]),
     titles: ['PUBG Mobile (ex-China)', 'BGMI (India, 2021)'],
+    note: 'The Korean publisher behind PUBG: Battlegrounds. Its mobile revenue comes principally from PUBG Mobile outside China, where Tencent handles publishing, and from Battlegrounds Mobile India, a market-specific version launched in 2021 after the original was banned.',
   },
   {
     id: 'mob-bandai', label: 'Bandai Namco (mobile)', company: 'bandai', segment: 'mobile',
     rev: yrs(2014, [400, 650, 850, 1000, 1050, 1000, 950, 900, 850, 820, 850, 870, 880]),
     titles: ['Dragon Ball Z: Dokkan Battle (2015)', 'One Piece Treasure Cruise'],
+    note: 'Bandai Namco\'s mobile business rests on long-running gacha adaptations of anime and manga licences, above all Dragon Ball Z: Dokkan Battle. Like several Japanese publishers, it earns a disproportionate share of its revenue domestically, where spending per paying player is among the highest in the world.',
   },
   {
     id: 'mob-other', label: 'Other mobile publishers', company: 'other', segment: 'mobile',
@@ -648,6 +670,7 @@ export const ENTITIES = [
   {
     id: 'vr-htc', label: 'HTC Vive', company: 'htc', segment: 'vr',
     rev: yrs(2016, [200, 280, 300, 260, 230, 200, 160, 130, 110, 100, 95]),
+    note: 'HTC developed the Vive with Valve, launching in April 2016 with the room-scale tracking that distinguished early high-end VR from seated experiences. HTC subsequently repositioned the line towards enterprise and training customers as consumer sales concentrated around cheaper standalone headsets.',
   },
   {
     id: 'vr-valve', label: 'Valve Index & SteamVR', company: 'valve', segment: 'vr',
@@ -658,6 +681,7 @@ export const ENTITIES = [
   {
     id: 'vr-pico', label: 'Pico (ByteDance)', company: 'bytedance', segment: 'vr',
     rev: yrs(2021, [180, 380, 300, 220, 200, 190]),
+    note: 'Pico was acquired by ByteDance in 2021 and is the principal standalone VR platform inside China, where Meta does not operate. Its international expansion was scaled back in 2023 following restructuring, leaving it largely a domestic Chinese platform.',
   },
   {
     id: 'vr-apple', label: 'Apple Vision Pro', company: 'apple', segment: 'vr',
@@ -694,6 +718,7 @@ export const ENTITIES = [
   {
     id: 'cl-amazon', label: 'Amazon Luna', company: 'amazon', segment: 'cloud',
     rev: yrs(2020, [20, 60, 90, 120, 150, 180, 210]),
+    note: 'Amazon Luna launched in the United States in 2020, structured as a set of subscription "channels" rather than a single catalogue, and integrated with Twitch and Fire TV hardware. It remains a small share of the cloud segment.',
   },
   {
     id: 'cl-other', label: 'Other cloud services', company: 'other', segment: 'cloud',

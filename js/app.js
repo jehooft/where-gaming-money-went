@@ -12,6 +12,8 @@ const SVGNS = 'http://www.w3.org/2000/svg';
 // ---------------------------------------------------------------- lookups
 const SEG = new Map(D.segments.map((s) => [s.id, s]));
 const PLAT = new Map(D.platforms.map((p) => [p.id, p]));
+const CO = new Map(D.companyNodes.map((c) => [c.id, c]));
+const REG = new Map(D.regions.map((r) => [r.id, r]));
 const Y0 = D.yearRange[0];
 const Y1 = D.yearRange[1];
 
@@ -62,7 +64,7 @@ function isWithin(key, ancestorKey) {
 // ---------------------------------------------------------------- state
 const state = {
   offset: 'wiggle',
-  resolution: 'annual',
+  region: 'world',
   // Real dollars by default: in nominal terms the 1982 arcade peak is ~4% of the 2026
   // total and disappears, so the whole 56-year span is unreadable on one linear scale.
   dollars: 'real',
@@ -137,24 +139,20 @@ function fmtValue(v, colIndex) {
 }
 
 // ---------------------------------------------------------------- columns
+// Annual only. A quarterly view existed in an earlier version; it was removed because
+// no public quarterly series exists for this industry before roughly 2010, so every
+// quarterly value was a fixed seasonality assumption repeated 57 times — it produced a
+// regular sawtooth that looked like measurement and was not.
 function columns() {
   const out = [];
-  if (state.resolution === 'annual') {
-    for (let y = state.from; y <= state.to; y++) {
-      out.push({ idx: y - Y0, year: y, q: null, label: String(y), t: y });
-    }
-  } else {
-    D.periods.forEach((p, i) => {
-      if (p.year >= state.from && p.year <= state.to) {
-        out.push({ idx: i, year: p.year, q: p.q, label: p.label, t: p.t });
-      }
-    });
+  for (let y = state.from; y <= state.to; y++) {
+    out.push({ idx: y - Y0, year: y, label: String(y), t: y });
   }
   return out;
 }
 
 function seriesFor(key, cols) {
-  const table = state.resolution === 'annual' ? D.annual : D.quarterly;
+  const table = state.region === 'world' ? D.annual : (D.regionAnnual[state.region] || D.annual);
   const src = table[key];
   if (!src) return cols.map(() => 0);
   const real = state.dollars === 'real';
@@ -323,10 +321,10 @@ function render() {
   drawXAxis(gAxis, gGrid, cols, x, plotTop, plotBottom, H);
   drawYAxis(gAxis, gGrid, y, lo, hi, plotLeft, plotRight);
 
-  // A near-flat spline in Share mode; the extra smoothing that helps the quarterly
+  // A stiffer spline in Share mode: the smoothing that flatters the stream is
+  // exactly what overshoots a 0-to-100% step.
   // stream is exactly what makes a 0→100% step overshoot.
-  const tension = state.offset === 'expand' ? 0.75
-    : state.resolution === 'quarterly' ? 0.55 : 0.35;
+  const tension = state.offset === 'expand' ? 0.75 : 0.35;
 
   const paths = [];
   bands.forEach((b, i) => {
@@ -379,7 +377,6 @@ function drawXAxis(g, gGrid, cols, x, plotTop, plotBottom, height) {
   const seen = new Set();
   cols.forEach((c, j) => {
     if (c.year % step !== 0 || seen.has(c.year)) return;
-    if (state.resolution === 'quarterly' && c.q !== 1) return;
     seen.add(c.year);
     const px = x(j);
     make('line', { x1: px, y1: plotTop, x2: px, y2: plotBottom, class: 'gridline' }, gGrid);
@@ -389,7 +386,7 @@ function drawXAxis(g, gGrid, cols, x, plotTop, plotBottom, height) {
 
   for (const era of D.eras) {
     if (era.from <= state.from || era.from >= state.to) continue;
-    const j = cols.findIndex((c) => c.year === era.from && (state.resolution === 'annual' || c.q === 1));
+    const j = cols.findIndex((c) => c.year === era.from);
     if (j < 0) continue;
     make('line', { x1: x(j), y1: M.top, x2: x(j), y2: height - M.bottom, class: 'era-rule' }, gGrid);
     const t = make('text', { x: x(j) + 5, y: M.top + 10, class: 'era-label' }, g);
@@ -556,10 +553,7 @@ function drawNotes(g, bands, bounds, cols, x, y, plotTop, plotBottom, topEdge, b
     if (ev.year < state.from || ev.year > state.to) continue;
     if (state.hidden.has(ev.segment)) continue;
 
-    let j = state.resolution === 'annual'
-      ? cols.findIndex((c) => c.year === ev.year)
-      : cols.findIndex((c) => c.year === ev.year && c.q === ev.quarter);
-    if (j < 0) j = cols.findIndex((c) => c.year === ev.year);
+    const j = cols.findIndex((c) => c.year === ev.year);
     if (j < 0) continue;
 
     const idxs = segRows.get(ev.segment) || [];
@@ -760,6 +754,30 @@ function activate(key) {
   showDetail(n);
 }
 
+/**
+ * Clicking away is deliberately two-stage. The first click only clears the
+ * selection, so the highlight lifts and every band — including the sub-bands you
+ * just opened — returns to full colour. Only a second click collapses the
+ * drill-down. Without this you could never see all the minor sub-categories at
+ * full opacity, because opening one always selected it.
+ * @returns {boolean} true if anything was dismissed
+ */
+function dismissStep() {
+  if (state.selected) {          // stage 1: deselect, keep everything open
+    state.selected = null;
+    el('detail-card').hidden = true;
+    applyHighlight();
+    renderLegend();
+    return true;
+  }
+  if (state.expanded.size) {     // stage 2: collapse
+    state.expanded.clear();
+    render();
+    return true;
+  }
+  return false;
+}
+
 function collapseAll() {
   if (!state.expanded.size && !state.selected) return;
   state.expanded.clear();
@@ -836,8 +854,8 @@ function showDetail(n) {
   facts.push(['Peak', `${cols[peakJ].label} · ${fmtMoney(peakV)}`]);
 
   const note = (p && p.note)
-    || (n.level === 'segment' ? SEGMENT_BLURBS[n.segment] : null)
-    || (n.level === 'company' ? companyBlurb(n) : null);
+    || (n.level === 'segment' ? (SEG.get(n.segment) || {}).note : null)
+    || (n.level === 'company' ? (CO.get(n.key) || {}).note || companyBlurb(n) : null);
   const titles = p && p.titles;
 
   el('detail-body').innerHTML =
@@ -846,15 +864,6 @@ function showDetail(n) {
      ${titles ? `<ul class="titles">${titles.map((t) => `<li>${escapeHtml(t)}</li>`).join('')}</ul>` : ''}`;
 }
 
-const SEGMENT_BLURBS = {
-  arcade: 'Coin dropped into arcade video machines worldwide. Peaked in 1982 at roughly $8.5 billion nominal — comparable to the whole US box office at the time — then collapsed in North America. Japan kept a multi-billion-dollar arcade industry running for another twenty-five years.',
-  console: 'All consumer spending on home console ecosystems: hardware, games from every publisher, DLC, and online subscriptions. Cut by platform holder, so the PlayStation 4 band includes Call of Duty.',
-  pc: 'Cut by storefront — where the money is actually spent — because an EA game bought on Steam is Steam revenue. Boxed retail gave way to Battle.net, Steam, and the Chinese and Korean online portals.',
-  handheld: 'Dedicated handheld game systems with their own software libraries. Peaked in 2007 at around $12.5 billion, then collapsed almost entirely: the iPhone took the casual portable market and never gave it back.',
-  mobile: 'Phones and tablets, cut by publisher. Went from a carrier-deck curiosity to the largest segment in gaming in about twelve years, and has been more than half of all industry revenue since 2019.',
-  vr: 'Consumer VR headsets and their content. Real, growing, and persistently about 2% of the industry — roughly a tenth of what was forecast when the Rift and Vive shipped in 2016.',
-  cloud: 'Game streaming subscriptions and pay-per-play. The smallest segment on the chart, and the one where the most money has been lost getting there.',
-};
 
 function companyBlurb(n) {
   const kids = n.children || [];
@@ -1065,10 +1074,40 @@ el('range-reset').addEventListener('click', (e) => {
   rFrom.value = Y0; rTo.value = Y1; syncRange();
 });
 
+function updateRegionLabel() {
+  const r = state.region === 'world' ? null : REG.get(state.region);
+  el('region-label').textContent = r ? r.label : 'Worldwide';
+  el('region-note').hidden = !r;
+  if (r) el('region-note').textContent = r.note || '';
+  document.querySelectorAll('#region-picker button').forEach((b) => {
+    b.classList.toggle('on', b.dataset.value === state.region);
+  });
+}
+
 function updateBasisLabel() {
   el('basis-label').textContent = state.dollars === 'real'
     ? `inflation-adjusted to ${D.meta.cpiBaseYear} US dollars`
     : 'nominal US dollars';
+}
+
+function buildRegionPicker() {
+  const box = el('region-picker');
+  const mk = (id, label, title) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.dataset.value = id;
+    b.textContent = label;
+    b.title = title;
+    b.addEventListener('click', (e) => {
+      e.stopPropagation();
+      state.region = id;
+      updateRegionLabel();
+      render();
+    });
+    box.appendChild(b);
+  };
+  mk('world', 'Worldwide', 'Every region combined');
+  for (const r of D.regions) mk(r.id, r.short, r.label);
 }
 
 // theme
@@ -1085,21 +1124,29 @@ el('theme-toggle').addEventListener('click', (e) => {
 });
 
 const dlg = el('method');
+const aiDlg = el('ai-dialog');
 el('open-method').addEventListener('click', (e) => { e.stopPropagation(); dlg.showModal(); });
 el('method-close').addEventListener('click', () => dlg.close());
 dlg.addEventListener('click', (e) => { if (e.target === dlg) dlg.close(); });
+
+const openAi = (e) => { e.stopPropagation(); if (dlg.open) dlg.close(); aiDlg.showModal(); };
+el('open-ai').addEventListener('click', openAi);
+el('open-ai-2').addEventListener('click', openAi);
+el('ai-close').addEventListener('click', () => aiDlg.close());
+aiDlg.addEventListener('click', (e) => { if (e.target === aiDlg) aiDlg.close(); });
 
 // Clicking anywhere that isn't a control, a band or a popup collapses the drill-down.
 document.addEventListener('click', (e) => {
   if (!notePop.hidden && !notePop.contains(e.target)) notePop.hidden = true;
   if (e.target.closest('.toolbar, .rail, .crumbs, .rangebar, dialog, .note-pop, .masthead')) return;
-  collapseAll();
+  dismissStep();
 });
 
 document.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape') return;
+  if (aiDlg.open) { aiDlg.close(); return; }
   if (!notePop.hidden) { notePop.hidden = true; return; }
-  collapseAll();
+  dismissStep();
 });
 
 // ---------------------------------------------------------------- boot
@@ -1109,8 +1156,10 @@ window.addEventListener('resize', () => {
   resizeTimer = setTimeout(render, 120);
 });
 
+buildRegionPicker();
 applyTheme();
 updateBasisLabel();
+updateRegionLabel();
 render();
 
 })();

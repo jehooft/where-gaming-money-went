@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Where Gaming's Money Went — 1970–2026</title>
-<meta name="description" content="An interactive streamgraph of worldwide video game revenue by platform, company and console, every quarter from 1970 to 2026.">
+<meta name="description" content="An interactive streamgraph of worldwide video game revenue by platform, company, console and region, 1970 to 2026. Researched and built by AI; figures are sourced estimates.">
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -16,6 +16,8 @@
     </div>
     <div>
       <h1>Where gaming's<br><span class="hl">money went</span></h1>
+      <p class="ai-flag"><span class="ai-dot"></span>Researched, modelled and written by AI &mdash;
+        <button type="button" class="linkbtn" id="open-ai">read the disclaimer</button></p>
       <p class="deck">
         Fifty-six years of player spending &middot; 1970&ndash;2026 &middot; worldwide
         <span class="deck-sep">/</span>
@@ -34,7 +36,7 @@
       who actually took the money, and when.</p>
       <p class="intro-cta">Click a band to break it open:
       <b>segment &rarr; company &rarr; individual platform</b>. Scroll over the chart to zoom
-      the years. Click empty space to close everything.</p>
+      the years. Clicking empty space clears the selection; clicking again closes everything.</p>
     </div>
 
     <div class="card">
@@ -77,13 +79,6 @@
         </div>
       </div>
       <div class="tb-group">
-        <span class="tb-label">Resolution</span>
-        <div class="seg" data-control="resolution">
-          <button type="button" data-value="annual" class="on">Annual</button>
-          <button type="button" data-value="quarterly">Quarterly</button>
-        </div>
-      </div>
-      <div class="tb-group">
         <span class="tb-label">Dollars</span>
         <div class="seg" data-control="dollars">
           <button type="button" data-value="real" class="on">Real (2025&nbsp;$)</button>
@@ -99,6 +94,13 @@
         <button type="button" class="linkbtn" id="open-method">Method &amp; sources</button>
       </div>
     </div>
+
+    <div class="regionbar">
+      <span class="tb-label">Region</span>
+      <div class="seg regions" id="region-picker" data-control="region"></div>
+      <span class="region-current">Showing: <b id="region-label">Worldwide</b></span>
+    </div>
+    <p class="region-note" id="region-note" hidden></p>
 
     <nav class="crumbs" id="crumbs" aria-label="Drill-down state"></nav>
 
@@ -119,10 +121,49 @@
   </section>
 </main>
 
+<!-- ------------------------------------------------------- AI disclosure -->
+<dialog id="ai-dialog" class="method">
+  <button type="button" class="dialog-close" id="ai-close" aria-label="Close">&times;</button>
+  <h2>This was made by an AI</h2>
+
+  <p><b>Everything here &mdash; the research, the data model, the code and this text &mdash; was
+  produced by an AI system</b> (Claude, by Anthropic) working from public sources. No human
+  analyst has audited the figures.</p>
+
+  <p class="warn"><b>That means errors are possible, including confident-sounding ones.</b>
+  Language models can misremember a number, conflate two similar statistics, or state an
+  estimate with more certainty than it deserves. This project tries hard to guard against that
+  &mdash; every worldwide total is tied to a named source, the regional model is automatically
+  re-checked against eleven independently published figures on every build, and the working is
+  written down in <code>research/RESEARCH-NOTES.md</code> so you can follow it &mdash; but those
+  are mitigations, not guarantees.</p>
+
+  <p><b>How to use it responsibly.</b> Treat this as a well-sourced sketch of the shape of the
+  industry, not as a citable dataset. The broad strokes &mdash; the arcade peak and crash, the
+  handheld collapse, mobile overtaking everything &mdash; are robust and agree with multiple
+  independent sources. Individual band values, especially before 1985, for arcades after 1990,
+  and for any single company in any single region, are estimates that could be materially wrong.
+  If a specific number matters to you, check the primary source before using it.</p>
+
+  <p><b>What is a measurement and what is a model.</b> Worldwide segment totals are researched
+  from published figures. Console and handheld shapes are derived from published shipment data.
+  Regional splits, company-level regional mixes, and the split of a segment total between
+  individual platforms are <em>modelled</em> &mdash; they are reasoned estimates constrained to
+  add up to the researched totals. The Method &amp; sources panel sets out exactly which is which.</p>
+
+  <p class="muted">Made with Claude Code. Source, data and full working:
+  <code>research/RESEARCH-NOTES.md</code>.</p>
+</dialog>
+
 <!-- ------------------------------------------------------- methodology -->
 <dialog id="method" class="method">
   <button type="button" class="dialog-close" id="method-close" aria-label="Close">&times;</button>
   <h2>How this chart was built</h2>
+
+  <p class="ai-inline"><b>Made by an AI.</b> This project was researched, modelled and written
+  by an AI system, and has not been audited by a human analyst. Hallucinated or mis-stated
+  figures are possible. <button type="button" class="linkbtn" id="open-ai-2">Full
+  disclaimer</button>.</p>
 
   <p><b>What is being counted.</b> Worldwide <em>consumer</em> spending on video games: coin
   dropped into arcade machines, software bought at retail or digitally, DLC, subscriptions and
@@ -162,15 +203,21 @@
   follows published shipment data &mdash; plus software attach and a live-service multiplier that
   grows over time as DLC and microtransactions take over.</p>
 
-  <p class="warn"><b>What is modelled rather than measured.</b> There is no public quarterly series
-  for this industry before roughly 2010, and none at all for arcades or pre-1995 console markets.
-  Quarterly values here are the researched annual figure distributed using segment- and era-specific
-  seasonality &mdash; heavily holiday-weighted for retail-era consoles, nearly flat for mobile and
-  subscriptions &mdash; with launch quarters handled explicitly, so the PS5 contributes nothing
-  before Q4&nbsp;2020. <b>That seasonality is exactly why the quarterly view has a regular
-  sawtooth: it is a modelling assumption, not a measurement.</b> Use the annual view for anything
-  that matters. Pre-1985 figures and arcade figures after 1990 are the least certain numbers on
-  the chart.</p>
+  <p class="warn"><b>What is modelled rather than measured.</b> The worldwide segment totals
+  are researched. The split of those totals <em>between regions</em> is modelled: shares are
+  anchored on published regional revenue where it exists (Newzoo by region from 2021, CNG for
+  China, ISFE for Europe) and reconstructed from unit-sales geography before that. Company-level
+  regional mixes use affinity multipliers derived from published regional hardware splits &mdash;
+  which is how the chart knows Xbox has no Japanese business. The build re-checks the modelled
+  regional totals against eleven independently published figures on every run and reports the
+  gap; all eleven currently agree within tolerance, most within 8%. Pre-1985 figures and arcade
+  figures after 1990 remain the least certain numbers here.</p>
+
+  <p><b>An earlier version of this chart offered a quarterly view. It has been removed.</b> No
+  public quarterly series exists for this industry before roughly 2010, and none at all for
+  arcades or pre-1995 console markets, so every quarterly value was one fixed seasonality
+  assumption repeated fifty-seven times. It produced a regular sawtooth that looked like a
+  measurement and was not, which is a bad thing for a chart to do.</p>
 
   <p><b>Where this deliberately differs from other published versions.</b> The best-known chart of
   this shape shows arcade revenue collapsing to nothing after the mid-1980s, which is true of the

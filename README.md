@@ -1,7 +1,16 @@
 # Where Gaming's Money Went — 1970–2026
 
-An interactive streamgraph of worldwide consumer spending on video games, every quarter from
-1970 to 2026, drillable from platform segment down to individual console.
+An interactive streamgraph of worldwide consumer spending on video games, 1970 to 2026,
+drillable from platform segment down to individual console, and splittable by world region.
+
+> [!IMPORTANT]
+> **This project was researched, modelled and written by an AI system** (Claude), working from
+> public sources. No human analyst has audited the figures. AI systems can and do state wrong
+> numbers confidently. Every worldwide total here is tied to a named source and the regional
+> model is automatically re-checked against eleven independently published figures on every
+> build — but those are mitigations, not guarantees. Treat this as a well-sourced sketch of the
+> shape of the industry, not as a citable dataset. If a specific number matters to you, check
+> the primary source in [`research/RESEARCH-NOTES.md`](research/RESEARCH-NOTES.md) first.
 
 **Open `index.html`.** It works from a plain double-click — no build step, no server, no
 dependencies, no network access at runtime. (`node serve.mjs` starts a local server on port
@@ -15,11 +24,11 @@ dependencies, no network access at runtime. (`node serve.mjs` starts a local ser
 
 | | |
 |---|---|
-| **Drill down** | Click any band. A segment breaks into companies; a company breaks into individual platforms. `Console → Sony → PlayStation 1…5` is two clicks. Click empty space, or press <kbd>Esc</kbd>, to close everything. |
+| **Drill down** | Click any band. A segment breaks into companies; a company breaks into individual platforms. `Console → Sony → PlayStation 1…5` is two clicks. Clicking empty space (or <kbd>Esc</kbd>) clears the selection first, so everything returns to full colour; clicking again collapses. |
+| **Split by region** | Seven regions: North America, Europe, Japan, China, Rest of Asia-Pacific, Latin America, Middle East & Africa. The differences are stark — North America is the only region where console outsells mobile, China's console band is almost invisible thanks to the 2000–2015 sales ban, and Japan's arcade band is larger than every other region's combined. |
 | **Hide segments** | The eye icon in the legend removes a segment from the chart *entirely* — it stops counting towards the total and towards Share percentages. Useful for looking at console on its own. |
 | **Shape** | Stream (the flowing, widens-both-ways look), Centred, Stacked with a real y-axis, or Share as a 100% band. |
 | **Zoom** | Scroll over the chart to narrow or widen the time frame, anchored on the year under your cursor. Or drag the two sliders. Zooming in reveals more story notes and longer text. |
-| **Resolution** | Annual, or all 228 quarters. |
 | **Dollars** | Real 2025 dollars (the default — see below) or nominal. |
 | **Story notes** | 50 annotated moments; ~24 fit at desktop width. Click one to read the full text. |
 | **Detail panel** | Selecting a band shows launch date, launch price, lifetime hardware and software units, peak year, and key titles. |
@@ -29,8 +38,10 @@ dependencies, no network access at runtime. (`node serve.mjs` starts a local ser
 total and vanishes into a hairline. Inflation-adjusting is the only way to see 56 years on one
 linear scale.
 
-**Why the quarterly view has a regular sawtooth:** because seasonality is modelled, not
-measured — see the limitations below.
+**Why there is no quarterly view any more:** an earlier version had one. It was removed because
+no public quarterly series exists for this industry before roughly 2010, so every quarterly
+value was one fixed seasonality assumption repeated fifty-seven times. It produced a regular
+sawtooth that looked like a measurement and was not.
 
 ---
 
@@ -59,12 +70,15 @@ Each segment is cut the only way it *can* be cut without double-counting:
 
 ## Honest limitations
 
-- **Quarterly values are modelled, not measured.** No public quarterly series exists for this
-  industry before roughly 2010, and none at all for arcades or pre-1995 console markets. Annual
-  totals are distributed using segment- and era-specific seasonality (holiday-heavy for
-  retail-era consoles, nearly flat for mobile and subscriptions), with launch quarters handled
-  explicitly so the PS5 contributes nothing before Q4 2020. That fixed seasonality is exactly
-  why quarterly mode has a regular sawtooth. **Use the annual view for anything that matters.**
+- **Regional splits are modelled, not measured.** Worldwide segment totals are researched.
+  Their split between regions is anchored on published regional revenue where it exists
+  (Newzoo by region from 2021, CNG/GPC for China, ISFE for Europe) and reconstructed from
+  unit-sales geography before that. Company-level regional mixes use affinity multipliers
+  derived from published regional hardware splits. There is no per-platform-per-region source
+  data anywhere, so "PlayStation 2 in Latin America" is a model output, not a measurement.
+- **The regional model is checked automatically.** `node data/build.mjs` compares its output
+  against eleven independently published regional figures on every run and prints the gap for
+  each. All eleven currently pass, most within 8%.
 - **Pre-1985 figures and arcade figures after 1990 are the least certain numbers here.** Sources
   disagree by a factor of two on 1982 US arcade coin drop alone ($4.3bn vs $7.7bn).
 - **Newzoo restated its methodology in 2024–25**; two vintages disagree by ~$10bn on the same
@@ -124,8 +138,10 @@ js/app.js                   state, rendering, drill-down, notes, tooltips
 serve.mjs                   optional local static server
 snapshot.svg                static export of the default view (not used by the app)
 
-data/segments.mjs           ← RESEARCH: annual segment totals, seasonality, CPI
+data/segments.mjs           ← RESEARCH: annual segment totals, CPI
 data/platforms.mjs          ← RESEARCH: every platform, company and revenue series
+data/regions.mjs            ← RESEARCH: regional shares, company affinity, validation checks
+data/descriptions.mjs       ← RESEARCH: reference prose for every segment, company and region
 data/events.mjs             ← RESEARCH: the 50 story notes
 data/build.mjs              model → data/gaming-revenue.{json,js}
 data/gaming-revenue.js      generated; loaded by index.html
@@ -136,7 +152,7 @@ research/pdftext.js         minimal PDF text extractor used during research
 research/sources/           downloaded primary sources (git-ignored)
 ```
 
-**To change any number, edit the three files in `data/` marked RESEARCH and re-run:**
+**To change any number, edit the files in `data/` marked RESEARCH and re-run:**
 
 ```bash
 node data/build.mjs
@@ -172,6 +188,11 @@ total.
 
 4. **"Others" bands are residuals** — segment total minus everything named — so they are exact
    by construction rather than estimated.
+
+5. **Regions are applied last.** Each segment's worldwide total is split by researched regional
+   shares, then redistributed within the region by company affinity multipliers and
+   renormalised, so every region's bands still sum to that region's share of the segment. The
+   sum of all seven regions equals the worldwide figure to within $0.03M across all 57 years.
 
 Sources for every figure are in `research/RESEARCH-NOTES.md`.
 

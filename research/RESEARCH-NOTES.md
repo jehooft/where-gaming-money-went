@@ -337,3 +337,117 @@ naturally exclusive; PC is not.
 - PC named bands were rebuilt after the first pass, in which they exceeded the researched
   segment total for every year from 1995 to 2010 — a direct symptom of the
   publisher/storefront double-count described in 10.2.
+
+---
+
+## 11. Regional coverage (added in the second research pass)
+
+The first version of this project was, in honesty, a US-and-Japan chart wearing a
+"worldwide" label: US sources (Play Meter, NPD/Circana, Gaming Alexandria) and Japanese
+sources (Capcom, Sega Sammy, JAMMA) carried almost all the weight, and everything else was
+absorbed into residuals. This section records the sources added to fix that, and what they
+changed.
+
+### 11.1 Modern regional totals — Newzoo, by region
+
+From the free Global Games Market Report PDFs (`sources/newzoo2023.pdf`, p.21) and the
+2022/2025 summaries:
+
+| Year | Asia-Pacific | North America | Europe | Latin America | Middle East & Africa | Total |
+|---|---|---|---|---|---|---|
+| 2021 | — | $42.6B | — | — | — | $192.7B |
+| 2022 | $87.9B | — | — | $8.4B | $6.8B (MENA) | $182.9B |
+| 2023 | $85.8B (46%) | $51.6B (27%) | $34.4B (18%) | $8.8B (5%) | $7.2B (4%) | $187.7B |
+| 2025 | $87.6B (46%) | — | — | — | $7.1B (MENA) | $188.8B |
+
+These are **content only** — Newzoo excludes hardware, arcade and (largely) cloud, which is
+why the build subtracts this project's hardware/arcade/cloud estimate before comparing.
+
+### 11.2 China — CNG / Game Publishing Committee
+
+The authoritative Chinese figure is "actual sales revenue of the Chinese game market"
+(中国游戏市场实际销售收入), published annually by CNG with the Game Publishing Committee:
+
+| Year | Domestic market | Notes |
+|---|---|---|
+| 2022 | ~$45.5B | −10.3% YoY, the first decline on record |
+| 2023 | RMB 303bn (~$42.6B) | recovery year |
+| 2024 | RMB 325.8bn (~$44.8B) | +7.53%, record high. Mobile RMB 238.2bn (73%), PC RMB 68bn (20.9%) |
+
+Overseas revenue of Chinese self-developed games is reported **separately** ($18.6B in 2024,
++13.4%) and is deliberately *not* added to the China region here — it is spending by players
+in other regions and is already counted there.
+
+Sources: SCMP, App2top and Beijing Times reporting of the CNG/GPC annual conference, Dec 2024.
+
+### 11.3 South Korea — KOCCA, with an important caveat
+
+KOCCA's Game White Paper reports Korean game industry **sales** (매출액), which includes
+exports by Korean companies. It is *not* Korean consumer spending, and conflating the two is
+a common error:
+
+| Year | KOCCA industry sales | of which |
+|---|---|---|
+| 2021 | KRW 20.99tn | mobile 12.14tn, PC 5.63tn, console 1.52tn, **arcade 0.2733tn** |
+| 2023 | KRW 22.96tn | |
+| 2024 | KRW 23.85tn | mobile 14.07tn, PC 6.01tn, console 1.18tn |
+
+Korea held 4th place globally with a 7.2% share of the world market in 2024 — on the
+production measure. Korean *consumer* spending is roughly $8B, and that is what this project
+counts under "Rest of Asia-Pacific".
+
+Korean arcade history, from Nuri Kim, *"Before the Bang: The Rise, Fall and Legacy of the
+Korean Arcade"*, Game Studies 26(2): arcade was ~70% of a ~KRW 350bn (~$440M) Korean games
+market in 1995; roughly 14,000 authorised arcade parlours in 1997, peaking near 25,000 in
+2000, collapsing to 2,100 conventional arcades by end-2003; under 1% of the Korean market
+after 2007.
+
+### 11.4 Europe — ISFE and the UK coin-op market
+
+ISFE (with Ipsos/GameTrack and GSD) reports the European market at €19.0bn (2018),
+€23.3bn (2020), €23.5bn (2022) and €26.8bn (2024). ISFE's country coverage is narrower than
+Newzoo's "Europe" (which adds Russia and Türkiye), so the two are not interchangeable; this
+project follows the Newzoo definition because the segment spine is Newzoo-based.
+
+Historic European anchors (Video Game Sales Wiki compilation — internally inconsistent, used
+only as a cross-check): 1982 $800M retail; 1992 $5.49bn including UK arcade, of which
+Germany $1.755bn, France $997M, Italy $464M; EMEA consumer market $5.1bn (2001), $5.75bn
+(2002), $9.07bn (2003).
+
+**UK arcade** is the single most useful European datapoint recovered in this pass:
+£434 million ($870M) in 1992, and £275.4 million (~$430M) in 2011–13. It confirms that a
+US+Japan-only arcade series was materially incomplete.
+
+### 11.5 What the regional pass actually changed
+
+- **Arcade** is no longer implicitly US+Japan. Europe, Korea, Taiwan/SE Asia and the modern
+  Chinese family-entertainment-centre sector now carry explicit shares, anchored on the UK
+  and Korean figures above.
+- **PC in the 1980s** is now weighted 35–45% to Europe, reflecting the ZX Spectrum, C64 and
+  Amstrad home-computer software market that US-centric retail tracking never captured. This
+  is the lowest-confidence change in this pass and is flagged as such.
+- **Japan** was initially under-weighted by the model (modelled $15.5B against a commonly
+  reported ~$19B for 2023) and its console and mobile shares were raised accordingly.
+- **Company-level regional affinity** was added, so that Xbox correctly shows near-zero
+  Japanese revenue, Tencent and NetEase are overwhelmingly Chinese, the Korean portals
+  concentrate in Rest-of-APAC, and PlayStation over-indexes in Europe and Latin America.
+
+### 11.6 Automated validation
+
+`node data/build.mjs` re-checks the modelled regional totals against eleven independently
+published figures on every run and prints the gap for each, failing loudly if any drifts
+outside its stated tolerance. At the time of writing all eleven pass, most within 8%. The
+checks are defined in `data/regions.mjs` (`REGION_CHECKS`) so they can be extended.
+
+### 11.7 Known remaining gaps
+
+- No primary source was found for European or Latin American **arcade** revenue before 1992,
+  or for Taiwanese and South-East Asian arcade revenue in any period. Those shares are
+  inferred from arcade-parlour counts and per-capita comparisons.
+- Indian and African market data before 2015 is very thin; MEA and parts of Rest-of-APAC are
+  effectively back-cast from later shares.
+- The 1980s European home-computer software market has no clean published total. The share
+  used here is reasoned from hardware install bases, not measured.
+- Regional splits are applied at segment level with company affinity multipliers. There is no
+  per-platform-per-region source data, so e.g. "PlayStation 2 in Latin America" is a model
+  output, not a measurement.
