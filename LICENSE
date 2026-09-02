@@ -22,6 +22,24 @@ SOFTWARE.
 
 ---
 
+A NOTE ON THIRD-PARTY DATA REDISTRIBUTED HERE
+
+data/source/electricity-by-source.csv and data/source/carbon-intensity-check.csv are
+derived from Our World in Data's energy datasets, which incorporate Ember's Global
+Electricity Review and the Energy Institute Statistical Review of World Energy. Those
+are licensed CC BY 4.0 and are redistributed here under that licence, with attribution.
+
+data/source/eurostat-subfuels.csv is derived from Eurostat dataset nrg_bal_peh,
+(c) European Union. Eurostat data may be reused for commercial or non-commercial
+purposes provided the source is acknowledged.
+
+Emission factors are quoted from IPCC AR5 Working Group III Annex III and, where noted,
+derived from IPCC 2006 Guidelines default values and UNECE's 2021 Life Cycle Assessment
+of Electricity Generation Options.
+
+None of these organisations endorse this project or have reviewed it.
+
+
 A NOTE ON THE DATA
 
 The revenue figures in data/ are estimates compiled and modelled from public

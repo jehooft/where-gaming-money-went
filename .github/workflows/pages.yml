@@ -32,14 +32,16 @@ jobs:
 
       # Rebuilds data/gaming-revenue.{js,json} from the source data modules, so a
       # committed data file can never drift from the research it came from.
-      - name: Rebuild dataset
-        run: node data/build.mjs
+      - name: Rebuild datasets
+        run: |
+          node data/build.mjs
+          node data/build-energy.mjs
 
       - name: Fail if the committed dataset was stale
         run: |
-          if ! git diff --quiet -- data/gaming-revenue.js data/gaming-revenue.json; then
-            echo "::error::data/gaming-revenue.* is out of date. Run 'node data/build.mjs' and commit the result."
-            git --no-pager diff --stat -- data/gaming-revenue.js data/gaming-revenue.json
+          if ! git diff --quiet -- data/gaming-revenue.js data/gaming-revenue.json data/energy.js data/energy.json; then
+            echo "::error::A committed dataset is out of date. Run 'node data/build.mjs' and 'node data/build-energy.mjs', then commit the result."
+            git --no-pager diff --stat -- data/gaming-revenue.js data/gaming-revenue.json data/energy.js data/energy.json
             exit 1
           fi
 

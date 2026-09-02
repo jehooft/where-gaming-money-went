@@ -1,86 +1,18 @@
-/* Where Gaming's Money Went — 1970–2026
- * Interactive streamgraph with segment → company → platform drill-down.
- * Data: data/gaming-revenue.js (built by data/build.mjs). Maths: js/stream.js.
+/* Two datasets, one chart engine.
+ *
+ *   Tab 1  Where gaming's money went  — worldwide video game revenue, 1970-2026
+ *   Tab 2  Where our electricity comes from — generation by source, 1900-2025
+ *
+ * Both are drawn by the same streamgraph code; a "dataset adapter" supplies the
+ * tree, the series, the colours and the number formatting. Data:
+ * data/gaming-revenue.js and data/energy.js. Maths: js/stream.js.
  */
 (function () {
 'use strict';
 
-const D = window.GAMING_DATA;
 const S = window.Stream;
 const SVGNS = 'http://www.w3.org/2000/svg';
 
-// ---------------------------------------------------------------- lookups
-const SEG = new Map(D.segments.map((s) => [s.id, s]));
-const PLAT = new Map(D.platforms.map((p) => [p.id, p]));
-const CO = new Map(D.companyNodes.map((c) => [c.id, c]));
-const REG = new Map(D.regions.map((r) => [r.id, r]));
-const Y0 = D.yearRange[0];
-const Y1 = D.yearRange[1];
-
-// ---------------------------------------------------------------- tree
-// root → segments → companies → platforms
-const TREE = D.segments.map((s) => {
-  const companies = D.companyNodes
-    .filter((c) => c.segment === s.id)
-    .map((c) => ({
-      key: c.id, label: c.label, level: 'company', segment: s.id, company: c.company,
-      children: c.children.map((pid) => {
-        const p = PLAT.get(pid);
-        return {
-          key: pid, label: p.label, level: 'platform', segment: s.id,
-          company: c.company, node: p, children: null,
-        };
-      }),
-    }));
-  return {
-    key: `seg:${s.id}`, label: s.label, level: 'segment',
-    segment: s.id, company: null, children: companies,
-  };
-});
-
-const BYKEY = new Map();
-const PARENT = new Map();
-(function index(list, parent) {
-  for (const n of list) {
-    BYKEY.set(n.key, n);
-    PARENT.set(n.key, parent);
-    if (n.children) index(n.children, n);
-  }
-})(TREE, null);
-
-// A company band holding a single platform adds a level of nesting for nothing.
-for (const seg of TREE) for (const c of seg.children) c.collapsible = c.children.length > 1;
-
-/** Is `key` the node `ancestorKey`, or anywhere beneath it? */
-function isWithin(key, ancestorKey) {
-  let n = BYKEY.get(key);
-  while (n) {
-    if (n.key === ancestorKey) return true;
-    n = PARENT.get(n.key);
-  }
-  return false;
-}
-
-// ---------------------------------------------------------------- state
-const state = {
-  offset: 'wiggle',
-  region: 'world',
-  // Real dollars by default: in nominal terms the 1982 arcade peak is ~4% of the 2026
-  // total and disappears, so the whole 56-year span is unreadable on one linear scale.
-  dollars: 'real',
-  theme: 'dark',
-  showNotes: true,
-  showLabels: true,
-  expanded: new Set(),
-  hidden: new Set(),      // segment ids excluded from the chart entirely
-  selected: null,
-  hoverKey: null,
-  hoverCol: null,
-  from: Y0,
-  to: Y1,
-};
-
-// ---------------------------------------------------------------- helpers
 const el = (id) => document.getElementById(id);
 const svg = el('chart');
 const stage = el('stage');
@@ -95,173 +27,405 @@ function make(tag, attrs, parent) {
   if (parent) parent.appendChild(n);
   return n;
 }
-
 function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, (c) =>
     ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
-
-/**
- * Colours come from the local data files, but they are interpolated into style
- * attributes inside innerHTML. Validating the shape means a malformed value can
- * never break out of the attribute, whatever the data file says.
- */
+/** Colours reach innerHTML inside style attributes; validate the shape. */
 function safeColor(c) {
   return /^#[0-9a-fA-F]{3,8}$/.test(String(c)) ? String(c) : '#8b8b8b';
-}
-
-function fmtMoney(m) {
-  if (m == null || !isFinite(m)) return '—';
-  if (m >= 1000) return '$' + (m / 1000).toFixed(m >= 10000 ? 0 : 1) + 'B';
-  if (m >= 1) return '$' + m.toFixed(m >= 100 ? 0 : 1) + 'M';
-  if (m > 0) return '<$1M';
-  return '—';
-}
-function fmtMoneyLong(m) {
-  if (m >= 1000) return '$' + (m / 1000).toFixed(2) + ' billion';
-  return '$' + Math.round(m) + ' million';
 }
 function fmtPct(frac) {
   if (!isFinite(frac)) return '—';
   return (frac * 100).toFixed(frac < 0.001 && frac > 0 ? 2 : 1) + '%';
 }
-
-/**
- * Format a raw dollar value for display, honouring the current shape.
- * In Share mode the chart is normalised, so readouts must be too — the previous
- * version formatted raw $ millions as a percentage, which is why Mobile read as
- * "10,346,660%".
- */
-function fmtValue(v, colIndex) {
-  if (state.offset !== 'expand') return fmtMoney(v);
-  const total = lastData && lastData.totals ? lastData.totals[colIndex] : 0;
-  return total > 0 ? fmtPct(v / total) : '—';
+function siFmt(v, unit, big, bigDiv) {
+  if (v == null || !isFinite(v)) return '—';
+  if (v >= bigDiv) return (v / bigDiv).toFixed(v >= bigDiv * 100 ? 0 : 1) + big;
+  if (v >= 1) return v.toFixed(v >= 100 ? 0 : 1) + unit;
+  if (v > 0) return '<1' + unit;
+  return '—';
 }
 
-// ---------------------------------------------------------------- columns
-// Annual only. A quarterly view existed in an earlier version; it was removed because
-// no public quarterly series exists for this industry before roughly 2010, so every
-// quarterly value was a fixed seasonality assumption repeated 57 times — it produced a
-// regular sawtooth that looked like measurement and was not.
+// ===========================================================================
+// Dataset adapters
+// ===========================================================================
+// Each returns a common shape the chart engine understands.
+
+function buildTreeIndex(roots) {
+  const byKey = new Map(), parent = new Map();
+  (function walk(list, p) {
+    for (const n of list) {
+      byKey.set(n.key, n);
+      parent.set(n.key, p);
+      if (n.children) walk(n.children, n);
+    }
+  })(roots, null);
+  return { byKey, parent };
+}
+
+// ---------------------------------------------------------------- gaming
+function makeGaming() {
+  const D = window.GAMING_DATA;
+  const SEG = new Map(D.segments.map((s) => [s.id, s]));
+  const PLAT = new Map(D.platforms.map((p) => [p.id, p]));
+  const CO = new Map(D.companyNodes.map((c) => [c.id, c]));
+  const REG = new Map(D.regions.map((r) => [r.id, r]));
+
+  const roots = D.segments.map((s) => ({
+    key: `seg:${s.id}`, label: s.label, level: 'segment', top: s.id, company: null,
+    children: D.companyNodes.filter((c) => c.segment === s.id).map((c) => ({
+      key: c.id, label: c.label, level: 'company', top: s.id, company: c.company,
+      children: c.children.map((pid) => {
+        const p = PLAT.get(pid);
+        return { key: pid, label: p.label, level: 'platform', top: s.id, company: c.company, node: p, children: null };
+      }),
+    })),
+  }));
+  for (const r of roots) for (const c of r.children) c.collapsible = c.children.length > 1;
+  const { byKey, parent } = buildTreeIndex(roots);
+
+  const platIndex = new Map();
+  for (const r of roots) for (const c of r.children) {
+    c.children.forEach((p, i) => platIndex.set(p.key, { i, n: c.children.length }));
+  }
+
+  const Y0 = D.yearRange[0], Y1 = D.yearRange[1];
+  const fullIdx = [];
+  for (let y = Y0; y <= Y1; y++) fullIdx.push(y - Y0);
+  const topOrder = (() => {
+    const vals = D.segments.map((s) => fullIdx.map((i) => D.annual[`seg:${s.id}`][i] || 0));
+    return S.orderInsideOut(vals).map((i) => D.segments[i].id);
+  })();
+
+  return {
+    id: 'gaming',
+    yearRange: [Y0, Y1],
+    roots, byKey, parent, topOrder,
+    topLabel: 'Segments',
+    hideHint: 'The eye icon removes a segment from the chart completely, so it stops counting '
+      + 'towards the total.',
+    entityLabel: 'Region',
+    entities: [{ id: 'world', label: 'Worldwide', short: 'Worldwide', note: null }]
+      .concat(D.regions.map((r) => ({ id: r.id, label: r.label, short: r.short, note: r.note }))),
+    modes: [
+      { id: 'real', label: 'Real (2025 $)' },
+      { id: 'nominal', label: 'Nominal' },
+    ],
+    defaultMode: 'real',
+    basisText: (mode) => (mode === 'real'
+      ? 'inflation-adjusted to ' + D.meta.cpiBaseYear + ' US dollars'
+      : 'nominal US dollars'),
+    axisTitle: () => 'Revenue',
+    events: D.events.map((e) => ({ ...e, anchorTop: e.segment })),
+    eras: D.eras,
+    series(key, cols, ctx) {
+      const table = ctx.entity === 'world' ? D.annual : (D.regionAnnual[ctx.entity] || D.annual);
+      const src = table[key];
+      if (!src) return cols.map(() => 0);
+      const real = ctx.mode === 'real';
+      return cols.map((c) => {
+        const v = src[c.idx] || 0;
+        return real ? v * (D.deflator[c.year] || 1) : v;
+      });
+    },
+    color(n) {
+      const segColor = SEG.get(n.top).color;
+      if (n.level === 'segment') return segColor;
+      const co = (D.companies[n.company] && D.companies[n.company].color) || '#8b8b8b';
+      const base = S.mix(segColor, co, 0.5);
+      if (n.level === 'company') return base;
+      const pos = platIndex.get(n.key) || { i: 0, n: 1 };
+      const t = pos.n > 1 ? pos.i / (pos.n - 1) : 0.5;
+      return S.shade(base, 0.22 - 0.44 * t);
+    },
+    format: (v) => siFmt(v, 'M', 'B', 1000).replace(/^/, '$'),
+    formatLong: (v) => (v >= 1000 ? '$' + (v / 1000).toFixed(2) + ' billion' : '$' + Math.round(v) + ' million'),
+    scaleUnit: (v) => '$' + (v / 1000).toFixed(v < 1000 ? 1 : 0) + 'B',
+    detail(n) {
+      const p = n.level === 'platform' ? n.node : null;
+      const facts = [];
+      if (n.level === 'segment') facts.push(['Level', 'Segment']);
+      if (n.level === 'company') facts.push(['Level', `Company · ${SEG.get(n.top).label}`]);
+      if (n.level === 'platform') facts.push(['Level', `Platform · ${SEG.get(n.top).label}`]);
+      if (p && p.launch) facts.push(['Launched', `${p.launch.year}${p.launch.quarter ? ' Q' + p.launch.quarter : ''}`]);
+      if (p && p.launchPrice) facts.push(['Launch price', '$' + p.launchPrice]);
+      if (p && p.lifetimeUnits) facts.push(['Hardware', p.lifetimeUnits.toFixed(1) + 'M units']);
+      if (p && p.lifetimeSoftwareUnits) facts.push(['Software', Math.round(p.lifetimeSoftwareUnits) + 'M copies']);
+      const note = (p && p.note)
+        || (n.level === 'segment' ? (SEG.get(n.top) || {}).note : null)
+        || (n.level === 'company' ? (CO.get(n.key) || {}).note : null);
+      return { facts, note, tags: p && p.titles };
+    },
+    entityNote: (id) => (REG.get(id) || {}).note || null,
+  };
+}
+
+// ---------------------------------------------------------------- energy
+function makeEnergy() {
+  const D = window.ENERGY_DATA;
+  const N = new Map(D.nodes.map((n) => [n.id, n]));
+  const ENT = new Map(D.entities.map((e) => [e.id, e]));
+
+  const roots = D.groups.map((g) => ({
+    key: `grp:${g.id}`, label: g.label, level: 'group', top: g.id,
+    children: D.fuels.filter((f) => f.group === g.id).map((f) => {
+      const subs = D.nodes.filter((n) => n.level === 'subfuel' && n.fuel === f.id);
+      return {
+        key: `fuel:${f.id}`, label: f.label, level: 'fuel', top: g.id, fuel: f.id,
+        children: subs.map((s) => ({
+          key: s.id, label: s.label, level: 'subfuel', top: g.id, fuel: f.id, sub: s.subfuel, children: null,
+        })),
+      };
+    }),
+  }));
+  // A fuel only subdivides where a statistics agency reports the split, and that
+  // varies by country — set per entity in `refresh` below.
+  const { byKey, parent } = buildTreeIndex(roots);
+
+  const Y0 = D.meta.yearRange[0], Y1 = D.meta.yearRange[1];
+  const fullIdx = [];
+  for (let y = Y0; y <= Y1; y++) fullIdx.push(y - Y0);
+  const topOrder = (() => {
+    const vals = D.groups.map((g) => fullIdx.map((i) => (D.series.world[`grp:${g.id}`] || [])[i] || 0));
+    return S.orderInsideOut(vals).map((i) => D.groups[i].id);
+  })();
+
+  const subIndex = new Map();
+  for (const r of roots) for (const f of r.children) {
+    f.children.forEach((s, i) => subIndex.set(s.key, { i, n: f.children.length }));
+  }
+
+  const ds = {
+    id: 'energy',
+    yearRange: [Y0, Y1],
+    roots, byKey, parent, topOrder,
+    topLabel: 'Sources',
+    hideHint: 'The eye icon removes a source group from the chart completely, so it stops '
+      + 'counting towards the total and towards Share percentages.',
+    entityLabel: 'Country',
+    entities: D.entities.map((e) => ({ id: e.id, label: e.label, short: e.label, note: e.note })),
+    modes: [
+      { id: 'twh', label: 'Electricity (TWh)' },
+      { id: 'co2life', label: 'CO₂e — lifecycle' },
+      { id: 'co2direct', label: 'CO₂ — burned' },
+    ],
+    defaultMode: 'twh',
+    basisText: (mode) => (mode === 'twh'
+      ? 'electricity generated, terawatt-hours'
+      : mode === 'co2life'
+        ? 'greenhouse gases, million tonnes CO₂-equivalent, full lifecycle (IPCC AR5)'
+        : 'carbon dioxide from combustion only, million tonnes, fleet-average factors'),
+    axisTitle: (mode) => (mode === 'twh' ? 'Generation' : 'Emissions'),
+    events: D.events.map((e) => ({ ...e, anchorTop: (D.fuels.find((f) => f.id === e.fuel) || {}).group })),
+    eras: D.eras,
+    series(key, cols, ctx) {
+      const table = ctx.mode === 'twh' ? D.series
+        : ctx.mode === 'co2direct' ? D.carbonDirect : D.carbon;
+      const src = (table[ctx.entity] || {})[key];
+      if (!src) return cols.map(() => 0);
+      return cols.map((c) => src[c.idx] || 0);
+    },
+    color(n) {
+      if (n.level === 'group') return (D.groups.find((g) => g.id === n.top) || {}).color || '#888';
+      const f = D.fuels.find((x) => x.id === n.fuel);
+      const base = (f && f.color) || '#888';
+      if (n.level === 'fuel') return base;
+      const pos = subIndex.get(n.key) || { i: 0, n: 1 };
+      const t = pos.n > 1 ? pos.i / (pos.n - 1) : 0.5;
+      return S.shade(base, 0.3 - 0.55 * t);
+    },
+    format(v, _j, ctx) {
+      return ctx && ctx.mode !== 'twh'
+        ? siFmt(v, ' Mt', ' Gt', 1000)
+        : siFmt(v, ' TWh', ' PWh', 1000);
+    },
+    formatLong(v, ctx) {
+      const unit = ctx && ctx.mode !== 'twh' ? 'million tonnes CO₂' : 'TWh';
+      return (v >= 1000 ? (v / 1000).toFixed(2) + (unit === 'TWh' ? ' PWh' : ' billion tonnes CO₂')
+        : Math.round(v) + ' ' + unit);
+    },
+    scaleUnit(v, ctx) {
+      return ctx && ctx.mode !== 'twh'
+        ? (v / 1000).toFixed(v < 1000 ? 1 : 0) + ' Gt'
+        : (v / 1000).toFixed(v < 1000 ? 1 : 0) + ' PWh';
+    },
+    detail(n, ctx) {
+      const facts = [];
+      const meta = N.get(n.key) || {};
+      facts.push(['Level', n.level === 'group' ? 'Source group'
+        : n.level === 'fuel' ? 'Energy source' : 'Specific fuel']);
+      const cf = meta.carbon;
+      if (cf) {
+        facts.push(['Lifecycle', cf.life + ' gCO₂e/kWh']);
+        facts.push(['Range', cf.min + '–' + cf.max]);
+        if (cf.direct != null) facts.push(['When burned', cf.direct + ' gCO₂/kWh']);
+      }
+      if (n.level === 'subfuel' && meta.siec) facts.push(['Eurostat code', meta.siec]);
+      let note = meta.note || null;
+      if (cf && cf.derived) {
+        note = (note ? note + ' ' : '')
+          + '— Emission factor note: this fuel has no row in IPCC AR5 Annex III, so its factor is '
+          + 'derived. ' + cf.src;
+      }
+      return { facts, note, tags: null };
+    },
+    entityNote: (id) => (ENT.get(id) || {}).note || null,
+    /** Which fuels can be opened for this entity, and what years it covers. */
+    refresh(entity) {
+      const e = ENT.get(entity) || {};
+      const allowed = new Set(e.subfuels || []);
+      for (const r of roots) {
+        for (const f of r.children) f.collapsible = allowed.has(f.fuel) && f.children.length > 1;
+      }
+      return e.coverage || [Y0, Y1];
+    },
+    coverage: (id) => (ENT.get(id) || {}).coverage || [Y0, Y1],
+    subfuelsFor: (id) => (ENT.get(id) || {}).subfuels || [],
+  };
+  return ds;
+}
+
+const DATASETS = { gaming: makeGaming(), energy: makeEnergy() };
+
+// ===========================================================================
+// State
+// ===========================================================================
+const views = {
+  gaming: {
+    expanded: new Set(), hidden: new Set(), selected: null,
+    entity: 'world', mode: DATASETS.gaming.defaultMode,
+    from: DATASETS.gaming.yearRange[0], to: DATASETS.gaming.yearRange[1],
+  },
+  energy: {
+    // start with the three groups open, so the default view is the nine sources
+    expanded: new Set(DATASETS.energy.roots.map((r) => r.key)),
+    hidden: new Set(), selected: null,
+    entity: 'world', mode: DATASETS.energy.defaultMode,
+    from: DATASETS.energy.yearRange[0], to: DATASETS.energy.yearRange[1],
+  },
+};
+
+const state = {
+  tab: 'gaming',
+  offset: 'wiggle',
+  theme: 'dark',
+  showNotes: true,
+  showLabels: true,
+  hoverKey: null,
+  hoverCol: null,
+};
+
+const DS = () => DATASETS[state.tab];
+const V = () => views[state.tab];
+
+function isWithin(key, ancestorKey) {
+  const ds = DS();
+  let n = ds.byKey.get(key);
+  while (n) {
+    if (n.key === ancestorKey) return true;
+    n = ds.parent.get(n.key);
+  }
+  return false;
+}
+
+// ===========================================================================
+// Columns, bands, ordering
+// ===========================================================================
 function columns() {
+  const v = V(), ds = DS();
   const out = [];
-  for (let y = state.from; y <= state.to; y++) {
-    out.push({ idx: y - Y0, year: y, label: String(y), t: y });
+  for (let y = v.from; y <= v.to; y++) {
+    out.push({ idx: y - ds.yearRange[0], year: y, label: String(y), t: y });
   }
   return out;
 }
 
 function seriesFor(key, cols) {
-  const table = state.region === 'world' ? D.annual : (D.regionAnnual[state.region] || D.annual);
-  const src = table[key];
-  if (!src) return cols.map(() => 0);
-  const real = state.dollars === 'real';
-  return cols.map((c) => {
-    const v = src[c.idx] || 0;
-    return real ? v * (D.deflator[c.year] || 1) : v;
-  });
+  const v = V();
+  return DS().series(key, cols, { entity: v.entity, mode: v.mode });
 }
 
-// ---------------------------------------------------------------- visible bands
 function visibleBands() {
+  const v = V();
   const out = [];
   const walk = (nodes) => {
     for (const n of nodes) {
-      if (n.level === 'segment' && state.hidden.has(n.segment)) continue;
+      if (n.level === 'segment' || n.level === 'group') {
+        if (v.hidden.has(n.top)) continue;
+      }
       const canExpand = n.children && n.children.length > 0 && n.collapsible !== false;
-      if (canExpand && state.expanded.has(n.key)) walk(n.children);
+      if (canExpand && v.expanded.has(n.key)) walk(n.children);
       else out.push(n);
     }
   };
-  walk(TREE);
+  walk(DS().roots);
   return out;
 }
 
-// ---------------------------------------------------------------- colours
-const platIndexInCompany = new Map();
-for (const seg of TREE) {
-  for (const c of seg.children) {
-    c.children.forEach((p, i) => platIndexInCompany.set(p.key, { i, n: c.children.length }));
-  }
-}
-
-function bandColor(n) {
-  const segColor = SEG.get(n.segment).color;
-  if (n.level === 'segment') return segColor;
-  const coColor = (D.companies[n.company] && D.companies[n.company].color) || '#8b8b8b';
-  const base = S.mix(segColor, coColor, 0.5);
-  if (n.level === 'company') return base;
-  const pos = platIndexInCompany.get(n.key) || { i: 0, n: 1 };
-  const t = pos.n > 1 ? pos.i / (pos.n - 1) : 0.5;
-  return S.shade(base, 0.22 - 0.44 * t);
-}
-
-// ---------------------------------------------------------------- ordering
-const fullCols = (() => {
-  const a = [];
-  for (let y = Y0; y <= Y1; y++) a.push({ idx: y - Y0, year: y });
-  return a;
-})();
-
-// Segment order is computed once against the whole record, so the silhouette stays
-// stable as you drill in and out.
-const SEG_ORDER = (() => {
-  const vals = D.segments.map((s) => fullCols.map((c) => D.annual[`seg:${s.id}`][c.idx] || 0));
-  return S.orderInsideOut(vals).map((i) => D.segments[i].id);
-})();
-
 /**
- * Order the drawn bands bottom-to-top, hierarchically: segments keep their stable
- * order, companies are ordered inside-out within their segment, and a company's
- * platforms are always drawn contiguously. Without the company grouping step,
- * PlayStation 4 and PlayStation 5 end up separated by a Microsoft band.
+ * Bottom-to-top order. Top-level groups keep a stable inside-out order; within a
+ * group, children are ordered inside-out but kept contiguous, so sibling bands
+ * (PlayStation 1-5, or the coal ranks) are never split by an unrelated band.
  */
 function orderBands(bands, cols) {
-  const bySeg = new Map();
+  const ds = DS();
+  const byTop = new Map();
   for (const b of bands) {
-    if (!bySeg.has(b.segment)) bySeg.set(b.segment, []);
-    bySeg.get(b.segment).push(b);
+    if (!byTop.has(b.top)) byTop.set(b.top, []);
+    byTop.get(b.top).push(b);
   }
-
   const result = [];
-  for (const segId of SEG_ORDER) {
-    const group = bySeg.get(segId);
+  for (const topId of ds.topOrder) {
+    const group = byTop.get(topId);
     if (!group || !group.length) continue;
     if (group.length === 1) { result.push(group[0]); continue; }
 
-    // bucket by company so siblings stay adjacent
     const buckets = new Map();
     for (const b of group) {
-      const k = b.level === 'segment' ? '__segment__' : b.company;
+      const k = b.level === 'segment' || b.level === 'group' ? '__top'
+        : (b.company || b.fuel || b.key);
       if (!buckets.has(k)) buckets.set(k, []);
       buckets.get(k).push(b);
     }
-
     const keys = [...buckets.keys()];
     const memberSeries = new Map();
     const bucketTotals = keys.map((k) => {
-      const totals = new Array(cols.length).fill(0);
+      const t = new Array(cols.length).fill(0);
       for (const m of buckets.get(k)) {
         const s = seriesFor(m.key, cols);
         memberSeries.set(m.key, s);
-        for (let j = 0; j < cols.length; j++) totals[j] += s[j];
+        for (let j = 0; j < cols.length; j++) t[j] += s[j];
       }
-      return totals;
+      return t;
     });
-
     for (const ci of S.orderInsideOut(bucketTotals)) {
       const members = buckets.get(keys[ci]);
       if (members.length === 1) { result.push(members[0]); continue; }
-      const ord = S.orderInsideOut(members.map((m) => memberSeries.get(m.key)));
-      for (const i of ord) result.push(members[i]);
+      for (const i of S.orderInsideOut(members.map((m) => memberSeries.get(m.key)))) {
+        result.push(members[i]);
+      }
     }
   }
   return result;
 }
 
-// ---------------------------------------------------------------- geometry
+// ===========================================================================
+// Formatting
+// ===========================================================================
+function fmtValue(v, colIndex) {
+  if (state.offset === 'expand') {
+    const total = lastData && lastData.totals ? lastData.totals[colIndex] : 0;
+    return total > 0 ? fmtPct(v / total) : '—';
+  }
+  return DS().format(v, colIndex, { mode: V().mode });
+}
+
+// ===========================================================================
+// Geometry
+// ===========================================================================
 let W = 1200, H = 640;
-const M = { top: 26, right: 26, bottom: 40, left: 62 };
+const M = { top: 26, right: 26, bottom: 40, left: 68 };
 
 function layout() {
   const rect = stage.getBoundingClientRect();
@@ -272,7 +436,9 @@ function layout() {
   svg.setAttribute('height', H);
 }
 
-// ---------------------------------------------------------------- render
+// ===========================================================================
+// Render
+// ===========================================================================
 let lastRender = null;
 let lastData = null;
 
@@ -280,23 +446,19 @@ function render() {
   layout();
   while (svg.firstChild) svg.removeChild(svg.firstChild);
 
+  const ds = DS(), v = V();
   const cols = columns();
   const bands = orderBands(visibleBands(), cols);
   const values = bands.map((b) => seriesFor(b.key, cols));
   const totals = cols.map((_, j) => values.reduce((a, s) => a + s[j], 0));
   lastData = { cols, bands, values, totals };
 
-  // In Share mode, columns where nothing existed yet (1970) have no meaningful
-  // composition. Carrying the nearest real distribution keeps the ribbon a solid
-  // 100% band instead of spiking from zero through the spline.
+  // In Share mode, columns where nothing existed yet carry no composition.
   const stackValues = state.offset === 'expand' ? backfillEmptyColumns(values, totals) : values;
-
-  const order = bands.map((_, i) => i); // already bottom-to-top
-  const bounds = S.stack(stackValues, order, state.offset);
+  const bounds = S.stack(stackValues, bands.map((_, i) => i), state.offset);
 
   const noteRoom = state.showNotes && cols.length > 6
-    ? Math.round(Math.max(118, Math.min(215, H * 0.235)))
-    : 8;
+    ? Math.round(Math.max(118, Math.min(215, H * 0.235))) : 8;
   const plotTop = M.top + noteRoom;
   const plotBottom = H - M.bottom - noteRoom;
   const plotLeft = M.left;
@@ -310,7 +472,7 @@ function render() {
   lo -= pad; hi += pad;
 
   const x = (j) => plotLeft + (cols.length === 1 ? 0 : (j / (cols.length - 1)) * (plotRight - plotLeft));
-  const y = (v) => plotBottom - ((v - lo) / (hi - lo)) * (plotBottom - plotTop);
+  const y = (val) => plotBottom - ((val - lo) / (hi - lo)) * (plotBottom - plotTop);
 
   const gGrid = make('g', { class: 'grid' }, svg);
   const gBands = make('g', { class: 'bands' }, svg);
@@ -321,16 +483,12 @@ function render() {
   drawXAxis(gAxis, gGrid, cols, x, plotTop, plotBottom, H);
   drawYAxis(gAxis, gGrid, y, lo, hi, plotLeft, plotRight);
 
-  // A stiffer spline in Share mode: the smoothing that flatters the stream is
-  // exactly what overshoots a 0-to-100% step.
-  // stream is exactly what makes a 0→100% step overshoot.
   const tension = state.offset === 'expand' ? 0.75 : 0.35;
-
   const paths = [];
   bands.forEach((b, i) => {
     const d = S.areaPath(bounds[i], x, y, true, tension);
     const p = make('path', {
-      d, fill: bandColor(b), class: 'band', 'data-key': b.key,
+      d, fill: ds.color(b), class: 'band', 'data-key': b.key,
       'shape-rendering': 'geometricPrecision',
     }, gBands);
     p.__band = b;
@@ -352,8 +510,7 @@ function render() {
 
 function backfillEmptyColumns(values, totals) {
   const m = totals.length;
-  let firstReal = totals.findIndex((t) => t > 0);
-  if (firstReal <= 0) return values;
+  if (totals.findIndex((t) => t > 0) <= 0) return values;
   return values.map((s) => {
     const copy = s.slice();
     for (let j = 0; j < m; j++) {
@@ -369,23 +526,22 @@ function backfillEmptyColumns(values, totals) {
 
 // ---------------------------------------------------------------- axes
 function drawXAxis(g, gGrid, cols, x, plotTop, plotBottom, height) {
-  const span = state.to - state.from;
-  const step = span > 44 ? 10 : span > 22 ? 5 : span > 10 ? 2 : 1;
+  const v = V();
+  const span = v.to - v.from;
+  const step = span > 90 ? 20 : span > 44 ? 10 : span > 22 ? 5 : span > 10 ? 2 : 1;
   const baseY = height - M.bottom + 16;
   make('line', { x1: x(0), y1: height - M.bottom, x2: x(cols.length - 1), y2: height - M.bottom }, g);
 
-  const seen = new Set();
   cols.forEach((c, j) => {
-    if (c.year % step !== 0 || seen.has(c.year)) return;
-    seen.add(c.year);
+    if (c.year % step !== 0) return;
     const px = x(j);
     make('line', { x1: px, y1: plotTop, x2: px, y2: plotBottom, class: 'gridline' }, gGrid);
     const t = make('text', { x: px, y: baseY, 'text-anchor': 'middle' }, g);
     t.textContent = c.year;
   });
 
-  for (const era of D.eras) {
-    if (era.from <= state.from || era.from >= state.to) continue;
+  for (const era of DS().eras) {
+    if (era.from <= v.from || era.from >= v.to) continue;
     const j = cols.findIndex((c) => c.year === era.from);
     if (j < 0) continue;
     make('line', { x1: x(j), y1: M.top, x2: x(j), y2: height - M.bottom, class: 'era-rule' }, gGrid);
@@ -395,34 +551,31 @@ function drawXAxis(g, gGrid, cols, x, plotTop, plotBottom, height) {
 }
 
 function drawYAxis(g, gGrid, y, lo, hi, left, right) {
+  const ds = DS(), v = V();
   const title = make('text', { x: 6, y: 14, class: 'axis-title' }, g);
-  title.textContent = state.offset === 'expand' ? 'Share of total' : 'Revenue';
+  title.textContent = state.offset === 'expand' ? 'Share of total' : ds.axisTitle(v.mode);
 
   if (state.offset === 'expand') {
-    for (const v of [0, 0.25, 0.5, 0.75, 1]) {
-      make('line', { x1: left, y1: y(v), x2: right, y2: y(v), class: 'gridline' }, gGrid);
-      const t = make('text', { x: left - 8, y: y(v) + 4, 'text-anchor': 'end' }, g);
-      t.textContent = (v * 100) + '%';
+    for (const val of [0, 0.25, 0.5, 0.75, 1]) {
+      make('line', { x1: left, y1: y(val), x2: right, y2: y(val), class: 'gridline' }, gGrid);
+      const t = make('text', { x: left - 8, y: y(val) + 4, 'text-anchor': 'end' }, g);
+      t.textContent = (val * 100) + '%';
     }
     return;
   }
-
   if (state.offset === 'zero') {
-    for (const v of niceTicks(0, hi, 6)) {
-      make('line', { x1: left, y1: y(v), x2: right, y2: y(v), class: 'gridline' }, gGrid);
-      const t = make('text', { x: left - 8, y: y(v) + 4, 'text-anchor': 'end' }, g);
-      t.textContent = v === 0 ? '0' : '$' + (v / 1000).toFixed(v < 1000 ? 1 : 0) + 'B';
+    for (const val of niceTicks(0, hi, 6)) {
+      make('line', { x1: left, y1: y(val), x2: right, y2: y(val), class: 'gridline' }, gGrid);
+      const t = make('text', { x: left - 8, y: y(val) + 4, 'text-anchor': 'end' }, g);
+      t.textContent = val === 0 ? '0' : ds.scaleUnit(val, { mode: v.mode });
     }
     return;
   }
-
-  // Stream / Centred: absolute vertical position is meaningless, so show a scale
-  // bar for thickness rather than a misleading axis.
-  const unit = niceTicks(0, (hi - lo) / 3, 2).filter((v) => v > 0)[0] || (hi - lo) / 4;
+  // Stream / Centred: vertical position is meaningless, so show a thickness bar.
+  const unit = niceTicks(0, (hi - lo) / 3, 2).filter((val) => val > 0)[0] || (hi - lo) / 4;
   const mid = lo + (hi - lo) * 0.5;
-  const yTop = y(mid + unit / 2);
-  const yBot = y(mid - unit / 2);
-  const bx = left - 26;
+  const yTop = y(mid + unit / 2), yBot = y(mid - unit / 2);
+  const bx = left - 30;
   const bar = { stroke: 'currentColor', 'stroke-width': 1.4, opacity: 0.45 };
   make('line', Object.assign({ x1: bx, y1: yTop, x2: bx, y2: yBot }, bar), g);
   make('line', Object.assign({ x1: bx - 4, y1: yTop, x2: bx + 4, y2: yTop }, bar), g);
@@ -431,7 +584,7 @@ function drawYAxis(g, gGrid, y, lo, hi, left, right) {
   const lab = make('text', {
     x: bx - 8, y: cy, 'text-anchor': 'middle', transform: `rotate(-90 ${bx - 8} ${cy})`,
   }, g);
-  lab.textContent = '$' + (unit / 1000).toFixed(unit < 1000 ? 1 : 0) + 'B thickness';
+  lab.textContent = ds.scaleUnit(unit, { mode: v.mode }) + ' thick';
 }
 
 function niceTicks(min, max, count) {
@@ -442,12 +595,13 @@ function niceTicks(min, max, count) {
   const stepN = norm >= 7.5 ? 10 : norm >= 3.5 ? 5 : norm >= 1.5 ? 2 : 1;
   const step = stepN * mag;
   const out = [];
-  for (let v = Math.ceil(min / step) * step; v <= max + 1e-9; v += step) out.push(+v.toFixed(6));
+  for (let v2 = Math.ceil(min / step) * step; v2 <= max + 1e-9; v2 += step) out.push(+v2.toFixed(6));
   return out;
 }
 
 // ---------------------------------------------------------------- band labels
 function drawBandLabels(g, bands, bounds, values, cols, x, y) {
+  const ds = DS();
   const placed = [];
   const plotW = x(cols.length - 1) - x(0);
 
@@ -475,40 +629,32 @@ function drawBandLabels(g, bands, bounds, values, cols, x, y) {
       if (cx - w / 2 < x(0) - 4 || cx + w / 2 > x(cols.length - 1) + 4) continue;
 
       const showSub = best > 32;
-      const box = {
-        x0: cx - w / 2 - 6, x1: cx + w / 2 + 6,
-        y0: cy - size, y1: cy + size + (showSub ? 12 : 0),
-      };
+      const box = { x0: cx - w / 2 - 6, x1: cx + w / 2 + 6, y0: cy - size, y1: cy + size + (showSub ? 12 : 0) };
       if (placed.some((p) => !(box.x1 < p.x0 || box.x0 > p.x1 || box.y1 < p.y0 || box.y0 > p.y1))) continue;
       placed.push(box);
-      paint(b, i, bi, cx, cy, size, showSub);
+
+      const fill = ds.color(b);
+      const light = S.luminance(fill) > 0.45;
+      const ink = light ? 'rgba(10,12,16,.94)' : 'rgba(255,255,255,.97)';
+      const halo = light ? 'rgba(255,255,255,.45)' : 'rgba(0,0,0,.3)';
+      const t = make('text', {
+        x: cx, y: cy + size * 0.34, 'text-anchor': 'middle', class: 'band-label',
+        fill: ink, stroke: halo, 'stroke-width': 2.4, 'font-size': size,
+      }, g);
+      t.textContent = b.label;
+      if (showSub) {
+        const s2 = make('text', {
+          x: cx, y: cy + size * 0.34 + size * 0.95, 'text-anchor': 'middle', class: 'band-sub',
+          fill: ink, stroke: halo, 'stroke-width': 2,
+        }, g);
+        s2.textContent = fmtValue(values[i][bi], bi) + '  ·  ' + cols[bi].label;
+      }
       return;
     }
   });
-
-  function paint(b, i, bi, cx, cy, size, showSub) {
-    const fill = bandColor(b);
-    const light = S.luminance(fill) > 0.45;
-    const ink = light ? 'rgba(10,12,16,.94)' : 'rgba(255,255,255,.97)';
-    const halo = light ? 'rgba(255,255,255,.45)' : 'rgba(0,0,0,.3)';
-
-    const t = make('text', {
-      x: cx, y: cy + size * 0.34, 'text-anchor': 'middle', class: 'band-label',
-      fill: ink, stroke: halo, 'stroke-width': 2.4, 'font-size': size,
-    }, g);
-    t.textContent = b.label;
-
-    if (showSub) {
-      const s = make('text', {
-        x: cx, y: cy + size * 0.34 + size * 0.95, 'text-anchor': 'middle', class: 'band-sub',
-        fill: ink, stroke: halo, 'stroke-width': 2,
-      }, g);
-      s.textContent = fmtValue(values[i][bi], bi) + '  ·  ' + cols[bi].label;
-    }
-  }
 }
 
-// ---------------------------------------------------------------- story notes
+// ---------------------------------------------------------------- notes
 function wrapText(str, font, maxW, maxLines) {
   const words = str.split(/\s+/);
   const lines = [];
@@ -534,29 +680,29 @@ function wrapText(str, font, maxW, maxLines) {
 }
 
 function drawNotes(g, bands, bounds, cols, x, y, plotTop, plotBottom, topEdge, bottomEdge) {
-  const span = state.to - state.from;
+  const ds = DS(), v = V();
+  const span = v.to - v.from;
   const maxTier = span <= 20 ? 3 : W > 1500 ? 3 : W > 1080 ? 2 : 1;
   const boxW = Math.max(110, Math.min(178, (x(cols.length - 1) - x(0)) / 9));
   const titleFont = '700 10.5px "Inter", system-ui, sans-serif';
   const bodyFont = '400 9.8px "Inter", system-ui, sans-serif';
   const lineH = 11.5;
 
-  const segRows = new Map();
+  const topRows = new Map();
   bands.forEach((b, i) => {
-    if (!segRows.has(b.segment)) segRows.set(b.segment, []);
-    segRows.get(b.segment).push(i);
+    if (!topRows.has(b.top)) topRows.set(b.top, []);
+    topRows.get(b.top).push(i);
   });
 
   const items = [];
-  for (const ev of D.events) {
+  for (const ev of ds.events) {
     if (ev.tier > maxTier) continue;
-    if (ev.year < state.from || ev.year > state.to) continue;
-    if (state.hidden.has(ev.segment)) continue;
-
+    if (ev.year < v.from || ev.year > v.to) continue;
+    if (v.hidden.has(ev.anchorTop)) continue;
     const j = cols.findIndex((c) => c.year === ev.year);
     if (j < 0) continue;
 
-    const idxs = segRows.get(ev.segment) || [];
+    const idxs = topRows.get(ev.anchorTop) || [];
     let anchorY;
     if (idxs.length) {
       const a = Math.min.apply(null, idxs.map((i) => bounds[i][j][0]));
@@ -564,11 +710,10 @@ function drawNotes(g, bands, bounds, cols, x, y, plotTop, plotBottom, topEdge, b
       anchorY = y((a + b) / 2);
     } else anchorY = (plotTop + plotBottom) / 2;
 
-    const bodyMax = span <= 24 ? 5 : 3;
     items.push({
       ev, j, px: x(j), anchorY, side: ev.side,
       titleLines: wrapText(ev.title, titleFont, boxW, 2),
-      bodyLines: wrapText(ev.text, bodyFont, boxW, bodyMax),
+      bodyLines: wrapText(ev.text, bodyFont, boxW, span <= 24 ? 5 : 3),
     });
   }
 
@@ -578,20 +723,16 @@ function drawNotes(g, bands, bounds, cols, x, y, plotTop, plotBottom, topEdge, b
     bottom: Math.max(0, Math.floor((bottomEdge - plotBottom - 8) / laneSlot) - 1),
   };
 
-  // Place the most important notes first, so anything dropped for lack of room is
-  // a footnote rather than the crash of 1983.
   items.sort((a, b) => (a.ev.tier - b.ev.tier) || (a.px - b.px));
-
   const lanes = { top: [], bottom: [] };
   for (const it of items) {
     it.h = it.titleLines.length * 12 + it.bodyLines.length * lineH + 12;
     const arr = lanes[it.side];
     it.lane = null;
     for (let lane = 0; lane <= maxLane[it.side]; lane++) {
-      const occupied = arr[lane] || (arr[lane] = []);
-      const clash = occupied.some((o) => it.px - boxW / 2 < o.x1 + 10 && it.px + boxW / 2 > o.x0 - 10);
-      if (!clash) {
-        occupied.push({ x0: it.px - boxW / 2, x1: it.px + boxW / 2, h: it.h });
+      const occ = arr[lane] || (arr[lane] = []);
+      if (!occ.some((o) => it.px - boxW / 2 < o.x1 + 10 && it.px + boxW / 2 > o.x0 - 10)) {
+        occ.push({ x0: it.px - boxW / 2, x1: it.px + boxW / 2, h: it.h });
         it.lane = lane;
         break;
       }
@@ -600,9 +741,7 @@ function drawNotes(g, bands, bounds, cols, x, y, plotTop, plotBottom, topEdge, b
 
   const laneHeight = (side) => lanes[side].map((occ) =>
     Math.max.apply(null, occ.map((o) => o.h).concat([24])));
-  const topH = laneHeight('top');
-  const botH = laneHeight('bottom');
-
+  const topH = laneHeight('top'), botH = laneHeight('bottom');
   const laneY = (side, lane) => {
     const hs = side === 'top' ? topH : botH;
     let acc = 0;
@@ -615,7 +754,6 @@ function drawNotes(g, bands, bounds, cols, x, y, plotTop, plotBottom, topEdge, b
   };
 
   items.sort((a, b) => a.px - b.px);
-
   for (const it of items) {
     if (it.lane == null) continue;
     const boxY = laneY(it.side, it.lane);
@@ -625,7 +763,6 @@ function drawNotes(g, bands, bounds, cols, x, y, plotTop, plotBottom, topEdge, b
 
     const grp = make('g', { class: 'note-g note-hit' }, g);
     grp.__event = it.ev;
-
     const connectY = it.side === 'top' ? boxY + boxH + 4 : boxY - 6;
     make('path', { d: `M${it.px},${connectY}L${it.px},${it.anchorY}`, class: 'note-line' }, grp);
     make('circle', { cx: it.px, cy: it.anchorY, r: 2.6, class: 'note-dot' }, grp);
@@ -636,9 +773,10 @@ function drawNotes(g, bands, bounds, cols, x, y, plotTop, plotBottom, topEdge, b
         : Math.max(boxW / 2 + 6, Math.min(W - boxW / 2 - 6, it.px));
 
     let cy = boxY + 9;
+    const anchorNode = ds.roots.find((r) => r.top === it.ev.anchorTop);
     const yr = make('text', {
       x: tx, y: cy, 'text-anchor': anchor, class: 'note-year',
-      fill: SEG.get(it.ev.segment).color,
+      fill: anchorNode ? ds.color(anchorNode) : 'currentColor',
     }, grp);
     yr.textContent = it.ev.year;
     cy += 12;
@@ -658,14 +796,9 @@ function drawNotes(g, bands, bounds, cols, x, y, plotTop, plotBottom, topEdge, b
 }
 
 // ---------------------------------------------------------------- highlight
-/**
- * Dim everything that isn't the focused node *or one of its descendants*. When you
- * open Console, the Console band itself no longer exists — Sony, Nintendo and the
- * rest have replaced it — so matching on the exact key greyed out the entire chart.
- */
 function applyHighlight() {
   if (!lastRender) return;
-  const key = state.hoverKey || state.selected;
+  const key = state.hoverKey || V().selected;
   for (const p of lastRender.paths) {
     const related = !key || isWithin(p.__band.key, key);
     p.classList.toggle('dim', !!key && !related);
@@ -673,7 +806,9 @@ function applyHighlight() {
   }
 }
 
-// ---------------------------------------------------------------- interaction
+// ===========================================================================
+// Interaction
+// ===========================================================================
 svg.addEventListener('mousemove', (e) => {
   if (!lastRender) return;
   const pt = svgPoint(e);
@@ -687,52 +822,44 @@ svg.addEventListener('mousemove', (e) => {
   const key = band ? band.getAttribute('data-key') : null;
   if (key !== state.hoverKey) { state.hoverKey = key; applyHighlight(); }
   if (colChanged) renderRanks();
-
   if (key) showTooltip(key, j, e); else hideTooltip();
 });
 
 svg.addEventListener('mouseleave', () => {
-  state.hoverKey = null;
-  state.hoverCol = null;
-  applyHighlight();
-  hideTooltip();
-  renderRanks();
+  state.hoverKey = null; state.hoverCol = null;
+  applyHighlight(); hideTooltip(); renderRanks();
 });
 
 svg.addEventListener('click', (e) => {
   const noteEl = e.target.closest && e.target.closest('.note-g');
   if (noteEl && noteEl.__event) { e.stopPropagation(); openNote(noteEl.__event, e); return; }
   const bandEl = e.target.closest && e.target.closest('.band');
-  if (!bandEl) return;               // empty stage area falls through to collapse-all
+  if (!bandEl) return;
   e.stopPropagation();
   activate(bandEl.getAttribute('data-key'));
 });
 
-// Scroll to zoom the time frame, anchored on the year under the cursor.
 svg.addEventListener('wheel', (e) => {
   if (!lastRender) return;
   e.preventDefault();
+  const v = V(), ds = DS();
+  const cov = ds.coverage ? ds.coverage(v.entity) : ds.yearRange;
+  const LO = Math.max(ds.yearRange[0], cov[0]), HI = Math.min(ds.yearRange[1], cov[1]);
   const { plotLeft, plotRight } = lastRender;
   const pt = svgPoint(e);
   const frac = Math.max(0, Math.min(1, (pt.x - plotLeft) / Math.max(1, plotRight - plotLeft)));
-  const anchor = state.from + frac * (state.to - state.from);
-
-  const span = state.to - state.from;
-  const factor = e.deltaY > 0 ? 1.18 : 1 / 1.18;   // down = zoom out
-  const MIN_SPAN = 4;
-  let next = Math.round(Math.max(MIN_SPAN, Math.min(Y1 - Y0, span * factor)));
-
+  const anchor = v.from + frac * (v.to - v.from);
+  const span = v.to - v.from;
+  const factor = e.deltaY > 0 ? 1.18 : 1 / 1.18;
+  const next = Math.round(Math.max(4, Math.min(HI - LO, span * factor)));
   let from = Math.round(anchor - frac * next);
   let to = from + next;
-  if (from < Y0) { from = Y0; to = from + next; }
-  if (to > Y1) { to = Y1; from = to - next; }
-  if (from < Y0) from = Y0;
-
-  if (from === state.from && to === state.to) return;
-  rFrom.value = from; rTo.value = to;
-  el('range-from-out').textContent = from;
-  el('range-to-out').textContent = to;
-  state.from = from; state.to = to;
+  if (from < LO) { from = LO; to = from + next; }
+  if (to > HI) { to = HI; from = to - next; }
+  if (from < LO) from = LO;
+  if (from === v.from && to === v.to) return;
+  v.from = from; v.to = to;
+  syncRangeInputs();
   hideTooltip();
   render();
 }, { passive: false });
@@ -743,35 +870,36 @@ function svgPoint(e) {
 }
 
 function activate(key) {
-  const n = BYKEY.get(key);
+  const ds = DS(), v = V();
+  const n = ds.byKey.get(key);
   if (!n) return;
-  state.selected = key;
+  v.selected = key;
   if (n.children && n.children.length && n.collapsible !== false) {
-    if (state.expanded.has(key)) state.expanded.delete(key);
-    else state.expanded.add(key);
+    if (v.expanded.has(key)) v.expanded.delete(key);
+    else v.expanded.add(key);
   }
   render();
   showDetail(n);
 }
 
 /**
- * Clicking away is deliberately two-stage. The first click only clears the
- * selection, so the highlight lifts and every band — including the sub-bands you
- * just opened — returns to full colour. Only a second click collapses the
- * drill-down. Without this you could never see all the minor sub-categories at
- * full opacity, because opening one always selected it.
- * @returns {boolean} true if anything was dismissed
+ * Two-stage dismissal. The first click clears the selection, so the highlight
+ * lifts and every band — including sub-bands you just opened — returns to full
+ * colour. Only a second click collapses the drill-down.
  */
 function dismissStep() {
-  if (state.selected) {          // stage 1: deselect, keep everything open
-    state.selected = null;
+  const v = V();
+  if (v.selected) {
+    v.selected = null;
     el('detail-card').hidden = true;
     applyHighlight();
     renderLegend();
     return true;
   }
-  if (state.expanded.size) {     // stage 2: collapse
-    state.expanded.clear();
+  if (v.expanded.size) {
+    const ds = DS();
+    // energy starts with its three groups open; collapsing returns to that
+    v.expanded = ds.id === 'energy' ? new Set(ds.roots.map((r) => r.key)) : new Set();
     render();
     return true;
   }
@@ -779,43 +907,42 @@ function dismissStep() {
 }
 
 function collapseAll() {
-  if (!state.expanded.size && !state.selected) return;
-  state.expanded.clear();
-  state.selected = null;
+  const ds = DS(), v = V();
+  v.expanded = ds.id === 'energy' ? new Set(ds.roots.map((r) => r.key)) : new Set();
+  v.selected = null;
   el('detail-card').hidden = true;
   render();
 }
 
 // ---------------------------------------------------------------- tooltip
 function showTooltip(key, j, e) {
+  const ds = DS();
   const { cols, bands, values } = lastRender;
   const i = bands.findIndex((b) => b.key === key);
   if (i < 0) return hideTooltip();
   const b = bands[i];
-  const v = values[i][j];
+  const val = values[i][j];
   const total = lastData.totals[j];
   const rank = values.map((s, k) => ({ k, v: s[j] }))
     .sort((a, z) => z.v - a.v).findIndex((r) => r.k === i) + 1;
-  const c = cols[j];
   const canExpand = b.children && b.children.length && b.collapsible !== false;
+  const share = total > 0 ? fmtPct(val / total) : '—';
+  const raw = ds.format(val, j, { mode: V().mode });
+  const headline = state.offset === 'expand' ? share : raw;
+  const secondary = state.offset === 'expand' ? raw + ' of the total' : share + ' of the total';
 
-  const parentLabel = b.level === 'platform'
-    ? `${SEG.get(b.segment).label} › ${(D.companies[b.company] || {}).label || b.company}`
-    : b.level === 'company' ? SEG.get(b.segment).label : null;
-
-  const share = total > 0 ? fmtPct(v / total) : '—';
-  const headline = state.offset === 'expand' ? share : fmtMoney(v);
-  const secondary = state.offset === 'expand' ? fmtMoney(v) + ' of spending' : share + ' of all spending';
+  const parentNode = ds.parent.get(b.key);
+  const trail = parentNode ? parentNode.label : null;
 
   tooltip.innerHTML =
     `<div class="tt-head">
-      <span class="tt-sw" style="background:${safeColor(bandColor(b))}"></span>
+      <span class="tt-sw" style="background:${safeColor(ds.color(b))}"></span>
       <span class="tt-name">${escapeHtml(b.label)}</span>
-      <span class="tt-when">${escapeHtml(c.label)}</span>
+      <span class="tt-when">${escapeHtml(cols[j].label)}</span>
     </div>
     <div class="tt-val">${headline}</div>
-    <div class="tt-meta">${secondary} · #${rank} of ${bands.length}${parentLabel ? ' · ' + escapeHtml(parentLabel) : ''}</div>
-    ${canExpand ? `<div class="tt-hint">Click to ${state.expanded.has(b.key) ? 'collapse' : 'break out ' + b.children.length + ' ' + (b.level === 'segment' ? 'companies' : 'platforms')}</div>` : ''}`;
+    <div class="tt-meta">${secondary} · #${rank} of ${bands.length}${trail ? ' · ' + escapeHtml(trail) : ''}</div>
+    ${canExpand ? `<div class="tt-hint">Click to ${V().expanded.has(b.key) ? 'collapse' : 'break out ' + b.children.length + ' ' + (ds.id === 'energy' ? 'fuels' : b.level === 'segment' ? 'companies' : 'platforms')}</div>` : ''}`;
 
   tooltip.hidden = false;
   const r = stage.getBoundingClientRect();
@@ -831,49 +958,30 @@ function hideTooltip() { tooltip.hidden = true; }
 
 // ---------------------------------------------------------------- detail card
 function showDetail(n) {
-  const card = el('detail-card');
-  card.hidden = false;
+  const ds = DS(), v = V();
+  el('detail-card').hidden = false;
   el('detail-title').textContent = n.label;
 
-  const p = n.level === 'platform' ? n.node : null;
   const cols = columns();
   const series = seriesFor(n.key, cols);
   const total = series.reduce((a, b) => a + b, 0);
   let peakV = -1, peakJ = 0;
-  series.forEach((v, j) => { if (v > peakV) { peakV = v; peakJ = j; } });
+  series.forEach((val, j) => { if (val > peakV) { peakV = val; peakJ = j; } });
 
-  const facts = [];
-  if (n.level === 'segment') facts.push(['Level', 'Segment']);
-  if (n.level === 'company') facts.push(['Level', `Company · ${SEG.get(n.segment).label}`]);
-  if (n.level === 'platform') facts.push(['Level', `Platform · ${SEG.get(n.segment).label}`]);
-  if (p && p.launch) facts.push(['Launched', `${p.launch.year}${p.launch.quarter ? ' Q' + p.launch.quarter : ''}`]);
-  if (p && p.launchPrice) facts.push(['Launch price', '$' + p.launchPrice]);
-  if (p && p.lifetimeUnits) facts.push(['Hardware', p.lifetimeUnits.toFixed(1) + 'M units']);
-  if (p && p.lifetimeSoftwareUnits) facts.push(['Software', Math.round(p.lifetimeSoftwareUnits) + 'M copies']);
-  facts.push([`Total ${state.from}–${state.to}`, fmtMoneyLong(total)]);
-  facts.push(['Peak', `${cols[peakJ].label} · ${fmtMoney(peakV)}`]);
-
-  const note = (p && p.note)
-    || (n.level === 'segment' ? (SEG.get(n.segment) || {}).note : null)
-    || (n.level === 'company' ? (CO.get(n.key) || {}).note || companyBlurb(n) : null);
-  const titles = p && p.titles;
+  const d = ds.detail(n, { mode: v.mode }) || { facts: [], note: null };
+  const facts = d.facts.slice();
+  facts.push([`Total ${v.from}–${v.to}`, ds.formatLong(total, { mode: v.mode })]);
+  facts.push(['Peak', `${cols[peakJ].label} · ${ds.format(peakV, peakJ, { mode: v.mode })}`]);
 
   el('detail-body').innerHTML =
-    `<dl class="facts">${facts.map(([k, v]) => `<dt>${escapeHtml(k)}</dt><dd>${escapeHtml(v)}</dd>`).join('')}</dl>
-     ${note ? `<p class="note">${escapeHtml(note)}</p>` : ''}
-     ${titles ? `<ul class="titles">${titles.map((t) => `<li>${escapeHtml(t)}</li>`).join('')}</ul>` : ''}`;
-}
-
-
-function companyBlurb(n) {
-  const kids = n.children || [];
-  const named = kids.map((k) => k.label).slice(0, 6).join(', ');
-  return `${kids.length} platform${kids.length === 1 ? '' : 's'} in ${SEG.get(n.segment).label}: ${named}${kids.length > 6 ? ', and more' : ''}.`;
+    `<dl class="facts">${facts.map(([k, val]) => `<dt>${escapeHtml(k)}</dt><dd>${escapeHtml(val)}</dd>`).join('')}</dl>
+     ${d.note ? `<p class="note">${escapeHtml(d.note)}</p>` : ''}
+     ${d.tags ? `<ul class="titles">${d.tags.map((t) => `<li>${escapeHtml(t)}</li>`).join('')}</ul>` : ''}`;
 }
 
 el('detail-close').addEventListener('click', () => {
   el('detail-card').hidden = true;
-  state.selected = null;
+  V().selected = null;
   applyHighlight();
 });
 
@@ -882,6 +990,7 @@ const EYE_ON = '<svg class="eye" viewBox="0 0 16 16" aria-hidden="true"><path d=
 const EYE_OFF = '<svg class="eye" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.3 2.3 1.2 3.4l2.1 2.1A8.6 8.6 0 0 0 1.6 8c1 2.8 3.4 4.8 6.4 4.8 1.2 0 2.3-.3 3.3-.9l2 2 1.1-1.1L2.3 2.3zm5.7 8.9a3.2 3.2 0 0 1-2.9-4.6l1.3 1.3a1.6 1.6 0 0 0 1.9 1.9l1.3 1.3c-.5.1-1 .1-1.6.1zM8 3.2c3 0 5.4 2 6.4 4.8-.4 1-1 1.9-1.7 2.6l-2.3-2.3A3.2 3.2 0 0 0 6.5 4.6L5.2 3.3c.9-.1 1.8-.1 2.8-.1z" fill="currentColor"/></svg>';
 
 function renderLegend() {
+  const ds = DS(), v = V();
   const root = el('legend');
   const cols = columns();
   const lastJ = cols.length - 1;
@@ -889,39 +998,36 @@ function renderLegend() {
 
   const build = (nodes, parentEl) => {
     for (const n of nodes) {
-      const isSegment = n.level === 'segment';
-      const isHidden = isSegment && state.hidden.has(n.segment);
+      const isTop = n.level === 'segment' || n.level === 'group';
+      const isHidden = isTop && v.hidden.has(n.top);
       const li = document.createElement('li');
       if (isHidden) li.className = 'is-hidden';
 
       const canExpand = n.children && n.children.length && n.collapsible !== false;
-      const isOpen = state.expanded.has(n.key);
-      const v = isHidden ? null : seriesFor(n.key, cols)[lastJ] || 0;
+      const isOpen = v.expanded.has(n.key);
+      const val = isHidden ? null : seriesFor(n.key, cols)[lastJ] || 0;
 
       const row = document.createElement('div');
       row.className = 'row-wrap';
-
       const btn = document.createElement('button');
       btn.type = 'button';
-      btn.className = 'row' + (state.selected === n.key ? ' active' : '');
+      btn.className = 'row' + (v.selected === n.key ? ' active' : '');
       if (canExpand) btn.setAttribute('aria-expanded', String(isOpen));
       btn.innerHTML =
         `${canExpand
           ? '<svg class="caret" viewBox="0 0 8 8" aria-hidden="true"><path d="M2 1l4 3-4 3z" fill="currentColor"/></svg>'
           : '<span class="caret"></span>'}
-         <span class="swatch" style="background:${safeColor(bandColor(n))}"></span>
+         <span class="swatch" style="background:${safeColor(ds.color(n))}"></span>
          <span class="name">${escapeHtml(n.label)}</span>
-         <span class="val">${isHidden ? 'hidden' : fmtValue(v, lastJ)}</span>`;
+         <span class="val">${isHidden ? 'hidden' : fmtValue(val, lastJ)}</span>`;
       if (!isHidden) {
         btn.addEventListener('click', (e) => { e.stopPropagation(); activate(n.key); });
         btn.addEventListener('mouseenter', () => { state.hoverKey = n.key; applyHighlight(); });
         btn.addEventListener('mouseleave', () => { state.hoverKey = null; applyHighlight(); });
-      } else {
-        btn.disabled = true;
-      }
+      } else btn.disabled = true;
       row.appendChild(btn);
 
-      if (isSegment) {
+      if (isTop) {
         const eye = document.createElement('button');
         eye.type = 'button';
         eye.className = 'eyebtn';
@@ -931,13 +1037,13 @@ function renderLegend() {
         eye.setAttribute('aria-pressed', String(isHidden));
         eye.addEventListener('click', (e) => {
           e.stopPropagation();
-          if (state.hidden.has(n.segment)) state.hidden.delete(n.segment);
+          if (v.hidden.has(n.top)) v.hidden.delete(n.top);
           else {
-            state.hidden.add(n.segment);
-            state.expanded.delete(n.key);
-            for (const c of n.children) state.expanded.delete(c.key);
-            if (state.selected && isWithin(state.selected, n.key)) {
-              state.selected = null;
+            v.hidden.add(n.top);
+            v.expanded.delete(n.key);
+            for (const c of n.children) v.expanded.delete(c.key);
+            if (v.selected && isWithin(v.selected, n.key)) {
+              v.selected = null;
               el('detail-card').hidden = true;
             }
           }
@@ -945,7 +1051,6 @@ function renderLegend() {
         });
         row.appendChild(eye);
       }
-
       li.appendChild(row);
 
       if (canExpand && isOpen && !isHidden) {
@@ -957,59 +1062,59 @@ function renderLegend() {
       parentEl.appendChild(li);
     }
   };
-  build(TREE, root);
+  build(ds.roots, root);
 
-  const anyHidden = state.hidden.size > 0;
+  el('legend-title').textContent = ds.topLabel;
+  el('legend-hint').textContent = ds.hideHint;
   const showAll = el('show-all');
-  showAll.hidden = !anyHidden;
-  showAll.textContent = `Show all (${state.hidden.size} hidden)`;
+  showAll.hidden = v.hidden.size === 0;
+  showAll.textContent = `Show all (${v.hidden.size} hidden)`;
 }
 
 // ---------------------------------------------------------------- ranks
 function renderRanks() {
   if (!lastData) return;
+  const ds = DS();
   const { cols, bands, values, totals } = lastData;
   const j = state.hoverCol != null && state.hoverCol < cols.length ? state.hoverCol : cols.length - 1;
   const rows = bands.map((b, i) => ({ b, v: values[i][j] }))
-    .sort((a, z) => z.v - a.v)
-    .slice(0, 8);
+    .sort((a, z) => z.v - a.v).slice(0, 9);
   el('rank-period').textContent = cols[j] ? cols[j].label : '';
   el('ranklist').innerHTML = rows.map((r) =>
-    `<li><span class="rk-sw" style="background:${safeColor(bandColor(r.b))}"></span><b>${escapeHtml(r.b.label)}</b> <span class="v">${
+    `<li><span class="rk-sw" style="background:${safeColor(ds.color(r.b))}"></span><b>${escapeHtml(r.b.label)}</b> <span class="v">${
       state.offset === 'expand'
         ? (totals[j] > 0 ? fmtPct(r.v / totals[j]) : '—')
-        : fmtMoney(r.v)
+        : ds.format(r.v, j, { mode: V().mode })
     }</span></li>`).join('');
 }
 
 // ---------------------------------------------------------------- crumbs
 function renderCrumbs() {
+  const ds = DS(), v = V();
   const box = el('crumbs');
-  const open = [...state.expanded].map((k) => BYKEY.get(k)).filter(Boolean);
+  const baseline = ds.id === 'energy' ? new Set(ds.roots.map((r) => r.key)) : new Set();
+  const open = [...v.expanded].filter((k) => !baseline.has(k)).map((k) => ds.byKey.get(k)).filter(Boolean);
   box.innerHTML = '';
   if (!open.length) {
-    const s = document.createElement('span');
-    s.textContent = state.hidden.size
-      ? 'Click a band to break it into companies. Scroll over the chart to zoom the years.'
-      : 'Showing seven platform segments — click a band to break it into companies, or scroll to zoom the years.';
-    box.appendChild(s);
+    const s2 = document.createElement('span');
+    s2.textContent = ds.id === 'energy'
+      ? 'Click a source to break it into specific fuels, where the statistics report them. Scroll to zoom the years.'
+      : 'Click a band to break it into companies, or scroll to zoom the years.';
+    box.appendChild(s2);
     return;
   }
-  open.sort((a, b) => (a.level === 'segment' ? 0 : 1) - (b.level === 'segment' ? 0 : 1));
   const lead = document.createElement('span');
   lead.textContent = 'Opened:';
   box.appendChild(lead);
   for (const n of open) {
     const btn = document.createElement('button');
     btn.type = 'button';
-    btn.innerHTML = `<span class="dot" style="background:${safeColor(bandColor(n))}"></span>${escapeHtml(n.label)}<span class="x">×</span>`;
+    btn.innerHTML = `<span class="dot" style="background:${safeColor(ds.color(n))}"></span>${escapeHtml(n.label)}<span class="x">×</span>`;
     btn.title = 'Collapse ' + n.label;
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
-      state.expanded.delete(n.key);
-      if (n.level === 'segment') {
-        for (const c of n.children) state.expanded.delete(c.key);
-      }
+      v.expanded.delete(n.key);
+      if (n.children) for (const c of n.children) v.expanded.delete(c.key);
       render();
     });
     box.appendChild(btn);
@@ -1030,85 +1135,137 @@ function openNote(ev, e) {
   notePop.style.top = top + 'px';
 }
 notePop.querySelector('.note-close').addEventListener('click', (e) => {
-  e.stopPropagation();
-  notePop.hidden = true;
+  e.stopPropagation(); notePop.hidden = true;
 });
 
-// ---------------------------------------------------------------- controls
-document.querySelectorAll('.seg').forEach((group) => {
+// ===========================================================================
+// Controls
+// ===========================================================================
+document.querySelectorAll('.seg[data-control="offset"]').forEach((group) => {
   group.addEventListener('click', (e) => {
     const btn = e.target.closest('button');
     if (!btn) return;
     e.stopPropagation();
     group.querySelectorAll('button').forEach((b) => b.classList.toggle('on', b === btn));
-    state[group.dataset.control] = btn.dataset.value;
-    updateBasisLabel();
+    state.offset = btn.dataset.value;
     render();
   });
 });
 
-el('show-notes').addEventListener('change', (e) => { state.showNotes = e.target.checked; render(); });
-el('show-labels').addEventListener('change', (e) => { state.showLabels = e.target.checked; render(); });
-el('collapse-all').addEventListener('click', (e) => { e.stopPropagation(); collapseAll(); });
-el('show-all').addEventListener('click', (e) => {
-  e.stopPropagation();
-  state.hidden.clear();
-  render();
-});
-
-const rFrom = el('range-from'), rTo = el('range-to');
-function syncRange() {
-  let a = +rFrom.value, b = +rTo.value;
-  if (a > b - 3) { if (document.activeElement === rFrom) a = b - 3; else b = a + 3; }
-  a = Math.max(Y0, a); b = Math.min(Y1, b);
-  rFrom.value = a; rTo.value = b;
-  el('range-from-out').textContent = a;
-  el('range-to-out').textContent = b;
-  state.from = a; state.to = b;
-  render();
-}
-rFrom.addEventListener('input', syncRange);
-rTo.addEventListener('input', syncRange);
-el('range-reset').addEventListener('click', (e) => {
-  e.stopPropagation();
-  rFrom.value = Y0; rTo.value = Y1; syncRange();
-});
-
-function updateRegionLabel() {
-  const r = state.region === 'world' ? null : REG.get(state.region);
-  el('region-label').textContent = r ? r.label : 'Worldwide';
-  el('region-note').hidden = !r;
-  if (r) el('region-note').textContent = r.note || '';
-  document.querySelectorAll('#region-picker button').forEach((b) => {
-    b.classList.toggle('on', b.dataset.value === state.region);
-  });
-}
-
-function updateBasisLabel() {
-  el('basis-label').textContent = state.dollars === 'real'
-    ? `inflation-adjusted to ${D.meta.cpiBaseYear} US dollars`
-    : 'nominal US dollars';
-}
-
-function buildRegionPicker() {
-  const box = el('region-picker');
-  const mk = (id, label, title) => {
+function buildModePicker() {
+  const ds = DS(), v = V();
+  const box = el('mode-picker');
+  box.innerHTML = '';
+  for (const m of ds.modes) {
     const b = document.createElement('button');
     b.type = 'button';
-    b.dataset.value = id;
-    b.textContent = label;
-    b.title = title;
+    b.dataset.value = m.id;
+    b.textContent = m.label;
+    b.classList.toggle('on', v.mode === m.id);
     b.addEventListener('click', (e) => {
       e.stopPropagation();
-      state.region = id;
-      updateRegionLabel();
+      v.mode = m.id;
+      buildModePicker();
+      updateBasisLabel();
       render();
     });
     box.appendChild(b);
-  };
-  mk('world', 'Worldwide', 'Every region combined');
-  for (const r of D.regions) mk(r.id, r.short, r.label);
+  }
+  el('mode-label').textContent = ds.id === 'energy' ? 'Measure' : 'Dollars';
 }
+
+function buildEntityPicker() {
+  const ds = DS(), v = V();
+  const box = el('entity-picker');
+  box.innerHTML = '';
+  for (const en of ds.entities) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.dataset.value = en.id;
+    b.textContent = en.short;
+    b.title = en.label + (ds.coverage ? ` — data from ${ds.coverage(en.id)[0]}` : '');
+    b.classList.toggle('on', v.entity === en.id);
+    b.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const prevCov = ds.coverage ? ds.coverage(v.entity) : ds.yearRange;
+      const wasFullSpan = v.from <= prevCov[0] && v.to >= prevCov[1];
+      v.entity = en.id;
+      if (ds.refresh) {
+        const cov = ds.refresh(en.id);
+        if (wasFullSpan) {
+          // not zoomed in, so show everything the new country has
+          v.from = cov[0]; v.to = cov[1];
+        } else {
+          v.from = Math.max(v.from, cov[0]);
+          v.to = Math.min(v.to, cov[1]);
+          if (v.to - v.from < 4) { v.from = cov[0]; v.to = cov[1]; }
+        }
+        // a fuel that no longer subdivides here must not stay open
+        for (const k of [...v.expanded]) {
+          const n = ds.byKey.get(k);
+          if (n && n.level === 'fuel' && n.collapsible === false) v.expanded.delete(k);
+        }
+      }
+      buildEntityPicker();
+      updateEntityLabel();
+      syncRangeInputs();
+      render();
+    });
+    box.appendChild(b);
+  }
+  el('entity-title').textContent = ds.entityLabel;
+}
+
+function updateEntityLabel() {
+  const ds = DS(), v = V();
+  const en = ds.entities.find((x) => x.id === v.entity);
+  el('entity-label').textContent = en ? en.label : '';
+  const note = ds.entityNote(v.entity);
+  el('entity-note').hidden = !note;
+  if (note) el('entity-note').textContent = note;
+}
+
+function updateBasisLabel() {
+  el('basis-label').textContent = DS().basisText(V().mode);
+}
+
+el('show-notes').addEventListener('change', (e) => { state.showNotes = e.target.checked; render(); });
+el('show-labels').addEventListener('change', (e) => { state.showLabels = e.target.checked; render(); });
+el('collapse-all').addEventListener('click', (e) => { e.stopPropagation(); collapseAll(); });
+el('show-all').addEventListener('click', (e) => { e.stopPropagation(); V().hidden.clear(); render(); });
+
+const rFrom = el('range-from'), rTo = el('range-to');
+function syncRangeInputs() {
+  const ds = DS(), v = V();
+  const cov = ds.coverage ? ds.coverage(v.entity) : ds.yearRange;
+  const LO = Math.max(ds.yearRange[0], cov[0]), HI = Math.min(ds.yearRange[1], cov[1]);
+  rFrom.min = rTo.min = LO;
+  rFrom.max = rTo.max = HI;
+  v.from = Math.max(LO, Math.min(v.from, HI - 4));
+  v.to = Math.min(HI, Math.max(v.to, v.from + 4));
+  rFrom.value = v.from; rTo.value = v.to;
+  el('range-from-out').textContent = v.from;
+  el('range-to-out').textContent = v.to;
+}
+function onRangeInput() {
+  const v = V();
+  let a = +rFrom.value, b = +rTo.value;
+  if (a > b - 3) { if (document.activeElement === rFrom) a = b - 3; else b = a + 3; }
+  v.from = a; v.to = b;
+  syncRangeInputs();
+  render();
+}
+rFrom.addEventListener('input', onRangeInput);
+rTo.addEventListener('input', onRangeInput);
+el('range-reset').addEventListener('click', (e) => {
+  e.stopPropagation();
+  const ds = DS(), v = V();
+  const cov = ds.coverage ? ds.coverage(v.entity) : ds.yearRange;
+  v.from = Math.max(ds.yearRange[0], cov[0]);
+  v.to = Math.min(ds.yearRange[1], cov[1]);
+  syncRangeInputs();
+  render();
+});
 
 // theme
 function applyTheme() {
@@ -1123,25 +1280,62 @@ el('theme-toggle').addEventListener('click', (e) => {
   render();
 });
 
+// ---------------------------------------------------------------- tabs
+function setTab(id) {
+  if (!DATASETS[id]) return;
+  state.tab = id;
+  state.hoverKey = null; state.hoverCol = null;
+  document.documentElement.setAttribute('data-tab', id);
+  document.querySelectorAll('.tabbtn').forEach((b) => {
+    const on = b.dataset.tab === id;
+    b.classList.toggle('on', on);
+    b.setAttribute('aria-selected', String(on));
+  });
+  const ds = DS(), v = V();
+  if (ds.refresh) ds.refresh(v.entity);
+
+  el('doc-title').innerHTML = ds.id === 'energy'
+    ? 'Where our<br><span class="hl">electricity comes from</span>'
+    : 'Where gaming\'s<br><span class="hl">money went</span>';
+  el('doc-deck-lead').textContent = ds.id === 'energy'
+    ? 'A century and a quarter of electricity · 1900–2025 · by source'
+    : 'Fifty-six years of player spending · 1970–2026 · worldwide';
+  el('intro-lead').textContent = ds.id === 'energy'
+    ? 'Every kilowatt-hour the world has generated, and what it was burned, split or blown out of.'
+    : 'From the arcade boom to home consoles, PC gaming and the phone in your pocket — who actually took the money, and when.';
+  el('intro-cta').innerHTML = ds.id === 'energy'
+    ? 'Click a source to break it open into specific fuels — <b>coal into lignite, bituminous and anthracite</b> — wherever the statistics report the split. Scroll to zoom the years.'
+    : 'Click a band to break it open: <b>segment → company → individual platform</b>. Scroll over the chart to zoom the years.';
+  el('detail-card').hidden = true;
+
+  buildModePicker();
+  buildEntityPicker();
+  updateEntityLabel();
+  updateBasisLabel();
+  syncRangeInputs();
+  render();
+}
+document.querySelectorAll('.tabbtn').forEach((b) => {
+  b.addEventListener('click', (e) => { e.stopPropagation(); setTab(b.dataset.tab); });
+});
+
+// ---------------------------------------------------------------- dialogs
 const dlg = el('method');
 const aiDlg = el('ai-dialog');
 el('open-method').addEventListener('click', (e) => { e.stopPropagation(); dlg.showModal(); });
 el('method-close').addEventListener('click', () => dlg.close());
 dlg.addEventListener('click', (e) => { if (e.target === dlg) dlg.close(); });
-
 const openAi = (e) => { e.stopPropagation(); if (dlg.open) dlg.close(); aiDlg.showModal(); };
 el('open-ai').addEventListener('click', openAi);
 el('open-ai-2').addEventListener('click', openAi);
 el('ai-close').addEventListener('click', () => aiDlg.close());
 aiDlg.addEventListener('click', (e) => { if (e.target === aiDlg) aiDlg.close(); });
 
-// Clicking anywhere that isn't a control, a band or a popup collapses the drill-down.
 document.addEventListener('click', (e) => {
   if (!notePop.hidden && !notePop.contains(e.target)) notePop.hidden = true;
-  if (e.target.closest('.toolbar, .rail, .crumbs, .rangebar, dialog, .note-pop, .masthead')) return;
+  if (e.target.closest('.toolbar, .rail, .crumbs, .rangebar, dialog, .note-pop, .masthead, .entitybar')) return;
   dismissStep();
 });
-
 document.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape') return;
   if (aiDlg.open) { aiDlg.close(); return; }
@@ -1156,10 +1350,7 @@ window.addEventListener('resize', () => {
   resizeTimer = setTimeout(render, 120);
 });
 
-buildRegionPicker();
 applyTheme();
-updateBasisLabel();
-updateRegionLabel();
-render();
+setTab('gaming');
 
 })();

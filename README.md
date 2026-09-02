@@ -1,7 +1,14 @@
-# Where Gaming's Money Went — 1970–2026
+# Two streamgraphs
 
-An interactive streamgraph of worldwide consumer spending on video games, 1970 to 2026,
-drillable from platform segment down to individual console, and splittable by world region.
+A single-page site with two tabs, both drawn by the same dependency-free streamgraph engine:
+
+| | | |
+|---|---|---|
+| **01** | **Where gaming's money went** | Worldwide video game revenue, 1970–2026, drillable from platform segment → company → individual console, splittable across seven world regions. |
+| **02** | **Where our electricity comes from** | World and national electricity generation by source, 1900–2025, drillable from fossil/nuclear/renewable → fuel → specific fuel, with a switch from terawatt-hours to carbon footprint. |
+
+The two tabs share their interactions and chart shapes but not their look — the electricity tab
+is a cooler, more instrument-like surface, because it is a different kind of thing.
 
 > [!IMPORTANT]
 > **This project was researched, modelled and written by an AI system** (Claude), working from
@@ -16,7 +23,8 @@ drillable from platform segment down to individual console, and splittable by wo
 dependencies, no network access at runtime. (`node serve.mjs` starts a local server on port
 8123 if you'd rather.)
 
-![Snapshot of the default view](snapshot.svg)
+![Gaming revenue, 1970-2026](snapshot.svg)
+![World electricity by source, 1900-2025](snapshot-electricity.svg)
 
 ---
 
@@ -25,7 +33,8 @@ dependencies, no network access at runtime. (`node serve.mjs` starts a local ser
 | | |
 |---|---|
 | **Drill down** | Click any band. A segment breaks into companies; a company breaks into individual platforms. `Console → Sony → PlayStation 1…5` is two clicks. Clicking empty space (or <kbd>Esc</kbd>) clears the selection first, so everything returns to full colour; clicking again collapses. |
-| **Split by region** | Seven regions: North America, Europe, Japan, China, Rest of Asia-Pacific, Latin America, Middle East & Africa. The differences are stark — North America is the only region where console outsells mobile, China's console band is almost invisible thanks to the 2000–2015 sales ban, and Japan's arcade band is larger than every other region's combined. |
+| **Split by region / country** | Gaming: seven world regions — North America is the only one where console outsells mobile, and Japan's arcade band is larger than every other region's combined. Electricity: the World plus 21 countries and the EU. |
+| **Carbon footprint** | On the electricity tab, switch the measure from TWh to CO₂ and every band is multiplied by its emission factor. Two bases: full lifecycle (IPCC AR5) where wind, solar and nuclear are small but non-zero, or combustion only, where they are zero. Watching coal stay the same height while hydro and nuclear collapse is the point of the feature. |
 | **Hide segments** | The eye icon in the legend removes a segment from the chart *entirely* — it stops counting towards the total and towards Share percentages. Useful for looking at console on its own. |
 | **Shape** | Stream (the flowing, widens-both-ways look), Centred, Stacked with a real y-axis, or Share as a 100% band. |
 | **Zoom** | Scroll over the chart to narrow or widen the time frame, anchored on the year under your cursor. Or drag the two sliders. Zooming in reveals more story notes and longer text. |
@@ -68,6 +77,36 @@ Each segment is cut the only way it *can* be cut without double-counting:
 
 ---
 
+## Electricity: what makes it different
+
+**The generation numbers are not modelled.** They are ingested verbatim from Our World in Data's
+*Electricity production by source* (which merges Ember, the Energy Institute Statistical Review
+and historical estimates back to 1900), with fuel-level detail from Eurostat. A trimmed copy of
+both is committed in `data/source/`, so every band traces to a source file.
+
+**The coal breakdown is real, and that is why it isn't everywhere.** Clicking coal opens it into
+lignite, other bituminous, sub-bituminous, coking coal and anthracite — for the EU, Germany,
+Poland, Czechia, France, Spain, Italy, the Netherlands and Greece, because Eurostat publishes
+that split. **No global agency publishes electricity generation by coal rank**, so for the World,
+the United States or China the app simply does not offer the drill-down rather than inventing it.
+
+**Coverage is per country and honest about it.** The upstream data carries renewables back to
+1965 but fossil fuels only from 1985. Charting the full available range would show Germany in
+1970 as nuclear and hydro alone — a spotlessly clean grid that never existed. So coverage is
+defined as the range with a *complete* fuel mix: 1900 for the World, 1920 for the UK, 1985 or
+1990 for everyone else, and the year slider clamps accordingly.
+
+**A mistake the validation caught.** The first version used the IPCC's *direct emissions* column
+for the combustion basis, and the modelled carbon intensity came out ~22% below Ember's published
+figure for essentially every country and year. That column describes a modern reference plant;
+the real fleet is older. Fitting the factors by least squares across 672 published country-year
+intensities gives coal 931, oil 773, gas 593 and bioenergy ≈ 0 gCO₂/kWh — values that sit inside
+independently published fleet averages, with the bioenergy result independently confirming that
+biogenic carbon is treated as neutral. 81 of 88 checks now pass; the seven that don't are
+CHP-heavy or hydro-dominated grids, and they are listed in the notes rather than tuned away.
+
+---
+
 ## Honest limitations
 
 - **Regional splits are modelled, not measured.** Worldwide segment totals are researched.
@@ -90,6 +129,19 @@ Each segment is cut the only way it *can* be cut without double-counting:
   Those show arcade collapsing to nothing after the mid-1980s, which is true of the United
   States and not of Japan, where arcade *operating* revenue was a multi-billion-dollar business
   well into the 2010s.
+
+**Electricity tab:**
+
+- **Wind is not split into onshore and offshore.** Eurostat has a single wind code; IRENA
+  publishes the split for capacity, not generation. Left out rather than approximated.
+- **Emission factors are constant over time**, so the carbon view slightly understates historical
+  emissions and overstates modern ones. A 2024 ultra-supercritical coal unit and a 1970s
+  subcritical one differ by well over 20% per kWh and are treated identically here.
+- **Generation is not consumption.** Transmission losses, plant own-use and net imports are
+  excluded, so a country's bands do not equal what its population used.
+- On the combustion basis bioenergy counts as zero, following the standard convention. That
+  convention is contested; the lifecycle basis (230 gCO₂e/kWh) is the better one to look at if
+  it concerns you.
 
 ---
 
@@ -138,6 +190,13 @@ js/app.js                   state, rendering, drill-down, notes, tooltips
 serve.mjs                   optional local static server
 snapshot.svg                static export of the default view (not used by the app)
 
+data/energy-sources.mjs     ← RESEARCH: fuel hierarchy, emission factors, entity list
+data/energy-descriptions.mjs ← RESEARCH: prose for every fuel, sub-fuel and country
+data/energy-events.mjs      ← RESEARCH: electricity milestones
+data/source/*.csv           committed upstream data (OWID, Eurostat) — the build reads these
+data/stage-energy-sources.mjs  trims the big downloads into data/source/
+data/build-energy.mjs       source CSVs → data/energy.{json,js}, with validation
+
 data/segments.mjs           ← RESEARCH: annual segment totals, CPI
 data/platforms.mjs          ← RESEARCH: every platform, company and revenue series
 data/regions.mjs            ← RESEARCH: regional shares, company affinity, validation checks
@@ -155,7 +214,8 @@ research/sources/           downloaded primary sources (git-ignored)
 **To change any number, edit the files in `data/` marked RESEARCH and re-run:**
 
 ```bash
-node data/build.mjs
+node data/build.mjs        # gaming
+node data/build-energy.mjs # electricity
 ```
 
 The build prints a summary table and warns if any segment's named bands exceed its researched

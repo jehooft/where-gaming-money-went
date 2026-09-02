@@ -1,10 +1,10 @@
 <!doctype html>
-<html lang="en" data-theme="dark">
+<html lang="en" data-theme="dark" data-tab="gaming">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Where Gaming's Money Went — 1970–2026</title>
-<meta name="description" content="An interactive streamgraph of worldwide video game revenue by platform, company, console and region, 1970 to 2026. Researched and built by AI; figures are sourced estimates.">
+<title>Where Gaming's Money Went &amp; Where Our Electricity Comes From</title>
+<meta name="description" content="Two interactive streamgraphs: worldwide video game revenue 1970-2026 by platform, company and region; and world electricity generation 1900-2025 by source, with a carbon-footprint view. Built by AI; figures are sourced estimates.">
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -14,16 +14,28 @@
     <div class="brandmark" aria-hidden="true">
       <span></span><span></span><span></span><span></span><span></span><span></span><span></span>
     </div>
-    <div>
-      <h1>Where gaming's<br><span class="hl">money went</span></h1>
+    <div class="masthead-text">
+      <h1 id="doc-title">Where gaming's<br><span class="hl">money went</span></h1>
       <p class="ai-flag"><span class="ai-dot"></span>Researched, modelled and written by AI &mdash;
         <button type="button" class="linkbtn" id="open-ai">read the disclaimer</button></p>
       <p class="deck">
-        Fifty-six years of player spending &middot; 1970&ndash;2026 &middot; worldwide
+        <span id="doc-deck-lead">Fifty-six years of player spending &middot; 1970&ndash;2026 &middot; worldwide</span>
         <span class="deck-sep">/</span>
         <span id="basis-label">inflation-adjusted to 2025 US dollars</span>
       </p>
     </div>
+    <nav class="tabs" role="tablist" aria-label="Datasets">
+      <button type="button" class="tabbtn on" data-tab="gaming" role="tab" aria-selected="true">
+        <span class="tabnum">01</span>
+        <span class="tabname">Gaming revenue</span>
+        <span class="tabsub">1970&ndash;2026</span>
+      </button>
+      <button type="button" class="tabbtn" data-tab="energy" role="tab" aria-selected="false">
+        <span class="tabnum">02</span>
+        <span class="tabname">Electricity</span>
+        <span class="tabsub">1900&ndash;2025</span>
+      </button>
+    </nav>
   </div>
 </header>
 
@@ -32,22 +44,23 @@
   <!-- ------------------------------------------------------- left rail -->
   <aside class="rail" id="rail">
     <div class="card intro">
-      <p>From the arcade boom to home consoles, PC gaming and the phone in your pocket &mdash;
-      who actually took the money, and when.</p>
-      <p class="intro-cta">Click a band to break it open:
+      <p id="intro-lead">From the arcade boom to home consoles, PC gaming and the phone in your
+      pocket &mdash; who actually took the money, and when.</p>
+      <p class="intro-cta" id="intro-cta">Click a band to break it open:
       <b>segment &rarr; company &rarr; individual platform</b>. Scroll over the chart to zoom
-      the years. Clicking empty space clears the selection; clicking again closes everything.</p>
+      the years.</p>
+      <p class="intro-foot">Clicking empty space clears the selection; clicking again closes
+      everything.</p>
     </div>
 
     <div class="card">
       <div class="card-head">
-        <h2>Segments</h2>
+        <h2 id="legend-title">Segments</h2>
         <button class="linkbtn" id="collapse-all" type="button">Collapse all</button>
       </div>
       <ul class="legend" id="legend"></ul>
       <button class="linkbtn showall" id="show-all" type="button" hidden>Show all</button>
-      <p class="legend-hint">The eye icon removes a segment from the chart completely, so it
-      stops counting towards the total.</p>
+      <p class="legend-hint" id="legend-hint"></p>
     </div>
 
     <div class="card" id="detail-card" hidden>
@@ -79,11 +92,8 @@
         </div>
       </div>
       <div class="tb-group">
-        <span class="tb-label">Dollars</span>
-        <div class="seg" data-control="dollars">
-          <button type="button" data-value="real" class="on">Real (2025&nbsp;$)</button>
-          <button type="button" data-value="nominal">Nominal</button>
-        </div>
+        <span class="tb-label" id="mode-label">Dollars</span>
+        <div class="seg" id="mode-picker"></div>
       </div>
       <div class="tb-group">
         <label class="check"><input type="checkbox" id="show-notes" checked> Story notes</label>
@@ -95,17 +105,17 @@
       </div>
     </div>
 
-    <div class="regionbar">
-      <span class="tb-label">Region</span>
-      <div class="seg regions" id="region-picker" data-control="region"></div>
-      <span class="region-current">Showing: <b id="region-label">Worldwide</b></span>
+    <div class="entitybar">
+      <span class="tb-label" id="entity-title">Region</span>
+      <div class="seg regions" id="entity-picker"></div>
+      <span class="region-current">Showing: <b id="entity-label">Worldwide</b></span>
     </div>
-    <p class="region-note" id="region-note" hidden></p>
+    <p class="region-note" id="entity-note" hidden></p>
 
     <nav class="crumbs" id="crumbs" aria-label="Drill-down state"></nav>
 
     <div class="stage" id="stage">
-      <svg id="chart" role="img" aria-label="Streamgraph of worldwide video game revenue by platform, 1970 to 2026"></svg>
+      <svg id="chart" role="img" aria-label="Streamgraph"></svg>
       <div class="tooltip" id="tooltip" hidden></div>
     </div>
 
@@ -126,112 +136,121 @@
   <button type="button" class="dialog-close" id="ai-close" aria-label="Close">&times;</button>
   <h2>This was made by an AI</h2>
 
-  <p><b>Everything here &mdash; the research, the data model, the code and this text &mdash; was
-  produced by an AI system</b> (Claude, by Anthropic) working from public sources. No human
-  analyst has audited the figures.</p>
+  <p><b>The research, the data pipeline, the code and this text were produced by an AI system</b>
+  (Claude, by Anthropic) working from public sources. No human analyst has audited it.</p>
 
-  <p class="warn"><b>That means errors are possible, including confident-sounding ones.</b>
-  Language models can misremember a number, conflate two similar statistics, or state an
-  estimate with more certainty than it deserves. This project tries hard to guard against that
-  &mdash; every worldwide total is tied to a named source, the regional model is automatically
-  re-checked against eleven independently published figures on every build, and the working is
-  written down in <code>research/RESEARCH-NOTES.md</code> so you can follow it &mdash; but those
-  are mitigations, not guarantees.</p>
+  <p class="warn"><b>Errors are possible, including confident-sounding ones.</b> Language models
+  can misremember a number, conflate two similar statistics, or state an estimate with more
+  certainty than it deserves. This project guards against that where it can &mdash; every figure
+  is tied to a named source, both datasets are automatically re-checked against independently
+  published figures on every build, and the working is written down in
+  <code>research/</code> &mdash; but those are mitigations, not guarantees.</p>
 
-  <p><b>How to use it responsibly.</b> Treat this as a well-sourced sketch of the shape of the
-  industry, not as a citable dataset. The broad strokes &mdash; the arcade peak and crash, the
-  handheld collapse, mobile overtaking everything &mdash; are robust and agree with multiple
-  independent sources. Individual band values, especially before 1985, for arcades after 1990,
-  and for any single company in any single region, are estimates that could be materially wrong.
-  If a specific number matters to you, check the primary source before using it.</p>
+  <p><b>The two tabs are not equally uncertain, and it matters which you are looking at.</b></p>
+  <ul>
+    <li><b>Electricity</b> is the more solid of the two. The generation numbers are <em>ingested
+    verbatim</em> from published statistics (Our World in Data's compilation of Ember and the
+    Energy Institute; Eurostat for the fuel-level detail). Nothing about the shape of those bands
+    is estimated by this project. The only derived quantity is the carbon series, which is
+    generation multiplied by a published emission factor.</li>
+    <li><b>Gaming revenue</b> is substantially modelled. Worldwide segment totals are researched
+    from published figures, but the split between individual platforms, and between regions, is
+    reasoned estimation constrained to add up to those totals.</li>
+  </ul>
 
-  <p><b>What is a measurement and what is a model.</b> Worldwide segment totals are researched
-  from published figures. Console and handheld shapes are derived from published shipment data.
-  Regional splits, company-level regional mixes, and the split of a segment total between
-  individual platforms are <em>modelled</em> &mdash; they are reasoned estimates constrained to
-  add up to the researched totals. The Method &amp; sources panel sets out exactly which is which.</p>
+  <p><b>How to use it responsibly.</b> Treat this as a well-sourced sketch, not a citable dataset.
+  Broad strokes are robust. Individual band values &mdash; especially pre-1985 gaming figures,
+  arcade after 1990, and any single company in any single region &mdash; are estimates that could
+  be materially wrong. If a specific number matters, check the primary source first.</p>
 
-  <p class="muted">Made with Claude Code. Source, data and full working:
-  <code>research/RESEARCH-NOTES.md</code>.</p>
+  <p class="muted">Made with Claude Code. Full working:
+  <code>research/RESEARCH-NOTES.md</code> and <code>research/ENERGY-NOTES.md</code>.</p>
 </dialog>
 
 <!-- ------------------------------------------------------- methodology -->
 <dialog id="method" class="method">
   <button type="button" class="dialog-close" id="method-close" aria-label="Close">&times;</button>
-  <h2>How this chart was built</h2>
+  <h2>How this was built</h2>
 
-  <p class="ai-inline"><b>Made by an AI.</b> This project was researched, modelled and written
-  by an AI system, and has not been audited by a human analyst. Hallucinated or mis-stated
-  figures are possible. <button type="button" class="linkbtn" id="open-ai-2">Full
+  <p class="ai-inline"><b>Made by an AI.</b> Researched, modelled and written by an AI system, not
+  audited by a human analyst. <button type="button" class="linkbtn" id="open-ai-2">Full
   disclaimer</button>.</p>
 
-  <p><b>What is being counted.</b> Worldwide <em>consumer</em> spending on video games: coin
-  dropped into arcade machines, software bought at retail or digitally, DLC, subscriptions and
-  in-app purchases. Business-to-business revenue &mdash; arcade cabinets sold to operators, engine
-  licences, advertising, esports sponsorship &mdash; is excluded, because counting it alongside
-  player spending would double-count the same dollar.</p>
+  <h3>02 &middot; Electricity, 1900&ndash;2025</h3>
 
-  <p><b>Hardware is included, but only dedicated games hardware.</b> Consoles, handhelds and VR
-  headsets count; gaming PCs, graphics cards and phones do not, because those are general-purpose
-  machines and their buyers are not only buying a games device. This is why the totals here run
-  above Newzoo's widely-quoted headline: Newzoo counts content only. 2024 reads as roughly
-  $207bn here versus their $182.7bn, and about $15bn of that gap is console and handheld hardware.
-  It also means a console band spikes in its launch quarter, which is exactly the behaviour you
-  want to see on a chart about hardware generations.</p>
+  <p><b>The generation figures are not modelled.</b> They are ingested verbatim from Our World in
+  Data's <em>Electricity production by source</em> dataset, which merges Ember's global electricity
+  data, the Energy Institute Statistical Review, and historical estimates that carry the world
+  series back to 1900. The build reads a trimmed copy committed in <code>data/source/</code>, so
+  the numbers on screen can be traced line by line to the published file.</p>
 
-  <p><b>How the bands are cut.</b> The three levels are segment &rarr; company &rarr; platform, but
-  "company" means something slightly different per segment, and it has to:</p>
+  <p><b>Sub-fuel detail comes from Eurostat.</b> Clicking coal opens it into lignite, other
+  bituminous coal, sub-bituminous coal, coking coal and anthracite; oil opens into fuel oil, gas
+  oil, petroleum coke and refinery gas; solar into photovoltaic and solar thermal. Those splits
+  are real reported statistics (Eurostat <code>nrg_bal_peh</code>) &mdash; which is why they are
+  available for the European Union and its member states and <em>not</em> for the World, the United
+  States or China. <b>No global agency publishes electricity generation broken down by coal rank</b>,
+  so rather than invent that split, the app simply does not offer it where it is not measured.
+  Sub-fuel shares are applied to the parent fuel's total so the two sources reconcile exactly.</p>
+
+  <p><b>The carbon view.</b> Switching the measure from terawatt-hours to CO&#8322; multiplies each
+  band by an emission factor. Two bases are offered because they answer different questions:</p>
   <ul>
-    <li><b>Console &amp; handheld</b> &mdash; by platform holder. A band is <em>all</em> money spent
-    on that ecosystem, including games from other publishers. PlayStation 4 includes Call of Duty.</li>
-    <li><b>PC</b> &mdash; by <em>storefront</em>. An EA game bought on Steam counts as Steam. This is
-    the only way to slice PC without counting the same sale twice.</li>
-    <li><b>Mobile</b> &mdash; by publisher, which is naturally exclusive since each game has one.</li>
-    <li><b>Arcade</b> &mdash; by the manufacturer of the machine that took the coin.</li>
-    <li><b>VR / Cloud</b> &mdash; by platform owner.</li>
+    <li><b>Lifecycle</b> &mdash; IPCC AR5 Working Group III, Annex III, Table A.III.2 median values,
+    read from the published PDF. Includes construction, fuel supply and decommissioning, so wind,
+    solar, hydro and nuclear are small but non-zero. Coal 820, gas 490, solar 45, hydro 24,
+    nuclear 12, wind 11 gCO&#8322;e/kWh.</li>
+    <li><b>Burned</b> &mdash; combustion only, which is what national greenhouse-gas inventories
+    measure, and biogenic carbon counts as neutral so bioenergy is zero.</li>
   </ul>
 
-  <p><b>Where the numbers come from.</b> Annual segment totals are the spine and are researched
-  directly: Play Meter and Vending Times arcade surveys for the 1970s&ndash;80s; NPD/Circana and
+  <p><b>An error this process caught.</b> The first attempt used the IPCC's <em>direct emissions</em>
+  column for the combustion basis and the modelled carbon intensity came out about 22% below
+  Ember's published figure for essentially every country and year. That column describes a modern
+  reference plant; the operating fleet is older and less efficient. Fitting the factors by least
+  squares across 672 published country-year intensities gives coal 931, oil 773, gas 593 and
+  bioenergy approximately zero gCO&#8322;/kWh &mdash; values that sit inside independently published
+  fleet averages, and a bioenergy result that independently confirms biogenic carbon is treated as
+  neutral. With those, 81 of 88 checks now agree within 20% or 30 gCO&#8322;/kWh. The seven that
+  don't are grids dominated by combined heat and power or by hydro, where a single fleet-average
+  factor is a poor fit; they are listed in the notes rather than tuned away.</p>
+
+  <h3>01 &middot; Gaming revenue, 1970&ndash;2026</h3>
+
+  <p><b>What is counted.</b> Worldwide <em>consumer</em> spending: coin dropped into arcade
+  machines, software bought at retail or digitally, DLC, subscriptions and in-app purchases.
+  Business-to-business revenue is excluded, because counting it alongside player spending would
+  double-count the same dollar. Dedicated games hardware is included (consoles, handhelds, VR
+  headsets); general-purpose hardware is not (gaming PCs, GPUs, phones). That is why totals here
+  run above Newzoo's headline, which counts content only.</p>
+
+  <p><b>How the bands are cut.</b> Console and handheld by platform holder, so a band is all money
+  spent on that ecosystem. PC by <em>storefront</em> &mdash; an EA game bought on Steam is Steam
+  revenue &mdash; because that is the only division that does not count a sale twice. Mobile by
+  publisher. Arcade by the manufacturer of the machine that took the coin.</p>
+
+  <p><b>Sources.</b> Play Meter and Vending Times arcade surveys for the 1970s&ndash;80s; NPD and
   Gaming Alexandria's compilation of contemporaneous trade estimates for US retail 1972&ndash;1999;
-  Capcom, Sega Sammy and JAMMA filings for the Japanese arcade market; DFC Intelligence for PC;
-  Newzoo, Sensor Tower and company filings from 2012 on. Every platform band is then rescaled so
-  each segment-year sums <em>exactly</em> to those researched totals.</p>
+  Capcom, Sega Sammy and JAMMA filings for Japanese arcades; DFC Intelligence for PC; Newzoo,
+  Sensor Tower and company filings from 2012 on; Newzoo by region, CNG/GPC for China and ISFE for
+  Europe for the regional split.</p>
 
-  <p><b>Platform shapes are derived, not guessed.</b> Console and handheld bands are computed from
-  hardware shipment curves &mdash; lifetime unit totals are matters of record, and the yearly split
-  follows published shipment data &mdash; plus software attach and a live-service multiplier that
-  grows over time as DLC and microtransactions take over.</p>
+  <p class="warn"><b>What is modelled here.</b> Segment totals are researched; the split of those
+  totals between individual platforms and between regions is estimation constrained to add up.
+  Company-level regional mixes use affinity multipliers derived from published regional hardware
+  splits &mdash; which is how the chart knows Xbox has no Japanese business. Eleven independently
+  published regional figures are re-checked on every build and all currently agree within
+  tolerance, most within 8%. Pre-1985 figures and arcade after 1990 are the least certain numbers
+  on the chart.</p>
 
-  <p class="warn"><b>What is modelled rather than measured.</b> The worldwide segment totals
-  are researched. The split of those totals <em>between regions</em> is modelled: shares are
-  anchored on published regional revenue where it exists (Newzoo by region from 2021, CNG for
-  China, ISFE for Europe) and reconstructed from unit-sales geography before that. Company-level
-  regional mixes use affinity multipliers derived from published regional hardware splits &mdash;
-  which is how the chart knows Xbox has no Japanese business. The build re-checks the modelled
-  regional totals against eleven independently published figures on every run and reports the
-  gap; all eleven currently agree within tolerance, most within 8%. Pre-1985 figures and arcade
-  figures after 1990 remain the least certain numbers here.</p>
+  <p><b>An earlier version offered a quarterly view. It was removed.</b> No public quarterly series
+  exists for this industry before roughly 2010, so every quarterly value was one seasonality
+  assumption repeated fifty-seven times &mdash; a regular sawtooth that looked like a measurement
+  and was not.</p>
 
-  <p><b>An earlier version of this chart offered a quarterly view. It has been removed.</b> No
-  public quarterly series exists for this industry before roughly 2010, and none at all for
-  arcades or pre-1995 console markets, so every quarterly value was one fixed seasonality
-  assumption repeated fifty-seven times. It produced a regular sawtooth that looked like a
-  measurement and was not, which is a bad thing for a chart to do.</p>
-
-  <p><b>Where this deliberately differs from other published versions.</b> The best-known chart of
-  this shape shows arcade revenue collapsing to nothing after the mid-1980s, which is true of the
-  United States and not of Japan, where arcade operating revenue was still a multi-billion-dollar
-  business through the 2010s. The arcade band here stays visible, restricted to the video-game
-  share of arcade operating revenue.</p>
-
-  <p><b>Inflation.</b> "Real" figures use US CPI-U annual averages, rebased to 2025 dollars.
-  2026 is a forecast year in every segment.</p>
-
-  <p class="muted">Full working, source list and per-year notes:
-  <code>research/RESEARCH-NOTES.md</code>. Data model: <code>data/segments.mjs</code>,
-  <code>data/platforms.mjs</code>, <code>data/events.mjs</code>; rebuild with
-  <code>node data/build.mjs</code>.</p>
+  <p class="muted">Data licences: Our World in Data and Ember, CC&nbsp;BY&nbsp;4.0; Eurostat,
+  &copy;&nbsp;European Union, reuse permitted with attribution. Rebuild with
+  <code>node data/build.mjs</code> and <code>node data/build-energy.mjs</code>.</p>
 </dialog>
 
 <div class="note-pop" id="note-pop" hidden>
@@ -241,6 +260,7 @@
 </div>
 
 <script src="data/gaming-revenue.js"></script>
+<script src="data/energy.js"></script>
 <script src="js/stream.js"></script>
 <script src="js/app.js"></script>
 </body>

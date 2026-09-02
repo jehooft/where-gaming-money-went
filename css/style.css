@@ -411,3 +411,113 @@ html, body {
   background: var(--panel); border: 1px solid var(--rule);
   border-left: 3px solid var(--accent-2); border-radius: 0 8px 8px 0;
 }
+
+/* ==========================================================================
+   TAB 02 — ELECTRICITY
+   A deliberately different register from the gaming tab: cooler, more technical,
+   a blueprint rather than an editorial page. Chart shapes and interactions are
+   identical; only the surface changes.
+   ========================================================================== */
+
+:root[data-tab="energy"] {
+  --bg:      #0a1014;
+  --bg-2:    #0f171c;
+  --panel:   #111b21;
+  --ink:     #e6f0f2;
+  --ink-2:   #9fb4bb;
+  --ink-3:   #647c85;
+  --rule:    #1b2930;
+  --rule-2:  #273941;
+  --accent:  #35c5b8;
+  --accent-2:#f2c14e;
+  --shadow:  0 1px 2px rgba(0,0,0,.55), 0 10px 30px rgba(0,0,0,.45);
+}
+:root[data-tab="energy"][data-theme="light"] {
+  --bg:      #eef2f1;
+  --bg-2:    #ffffff;
+  --panel:   #ffffff;
+  --ink:     #0e1a1f;
+  --ink-2:   #3f545c;
+  --ink-3:   #71878f;
+  --rule:    #dde5e4;
+  --rule-2:  #c3d0ce;
+  --accent:  #0f8b80;
+  --accent-2:#b07d12;
+  --shadow:  0 1px 2px rgba(14,26,31,.05), 0 8px 24px rgba(14,26,31,.07);
+}
+
+/* squared-off, instrument-panel geometry */
+:root[data-tab="energy"] .card,
+:root[data-tab="energy"] .toolbar,
+:root[data-tab="energy"] .stage,
+:root[data-tab="energy"] .rangebar,
+:root[data-tab="energy"] .entitybar { border-radius: 3px; }
+:root[data-tab="energy"] .seg { border-radius: 3px; }
+:root[data-tab="energy"] .seg button.on { color: #06131a; }
+
+/* a faint grid behind the chart, like graph paper */
+:root[data-tab="energy"] .stage {
+  background-image:
+    linear-gradient(var(--rule) 1px, transparent 1px),
+    linear-gradient(90deg, var(--rule) 1px, transparent 1px);
+  background-size: 28px 28px;
+  background-position: -1px -1px;
+}
+:root[data-tab="energy"][data-theme="light"] .stage { background-color: var(--panel); }
+
+:root[data-tab="energy"] .masthead h1 { letter-spacing: -0.02em; font-weight: 250; }
+:root[data-tab="energy"] .masthead h1 .hl { font-weight: 700; }
+:root[data-tab="energy"] .card h2,
+:root[data-tab="energy"] .tb-label { letter-spacing: .16em; }
+
+/* the brandmark restates the fuel palette on this tab */
+:root[data-tab="energy"] .brandmark span:nth-child(1) { background: #4a4a52; }
+:root[data-tab="energy"] .brandmark span:nth-child(2) { background: #7d5c4a; }
+:root[data-tab="energy"] .brandmark span:nth-child(3) { background: #c98b4b; }
+:root[data-tab="energy"] .brandmark span:nth-child(4) { background: #d4b02a; }
+:root[data-tab="energy"] .brandmark span:nth-child(5) { background: #2f7fb8; }
+:root[data-tab="energy"] .brandmark span:nth-child(6) { background: #5ec2c2; }
+:root[data-tab="energy"] .brandmark span:nth-child(7) { background: #7a9e4f; }
+
+/* ------------------------------------------------------------------ tabs */
+.masthead-inner { align-items: flex-start; }
+.masthead-text { flex: 1; min-width: 0; }
+.tabs { display: flex; gap: 8px; flex: none; }
+.tabbtn {
+  display: flex; flex-direction: column; gap: 1px;
+  padding: 9px 14px 10px; min-width: 132px;
+  background: none; border: 1px solid var(--rule-2); border-radius: 8px;
+  color: var(--ink-3); font: inherit; text-align: left; cursor: pointer;
+  transition: border-color .14s ease, color .14s ease, background .14s ease;
+}
+:root[data-tab="energy"] .tabbtn { border-radius: 3px; }
+.tabbtn:hover { border-color: var(--accent); color: var(--ink-2); }
+.tabbtn.on {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--ink);
+}
+.tabnum {
+  font-family: var(--mono); font-size: 9.5px; letter-spacing: .14em;
+  color: var(--accent); font-weight: 700;
+}
+.tabname { font-size: 13.5px; font-weight: 650; letter-spacing: -.01em; }
+.tabsub { font-family: var(--mono); font-size: 10px; color: var(--ink-3); }
+
+@media (max-width: 780px) {
+  .masthead-inner { flex-wrap: wrap; }
+  .tabs { width: 100%; }
+  .tabbtn { flex: 1; min-width: 0; }
+}
+
+.intro-foot {
+  margin: 8px 0 0 !important; font-size: 11.5px; color: var(--ink-3) !important;
+  border-top: 1px solid var(--rule); padding-top: 8px;
+}
+
+/* the entity bar is shared by both tabs (Region / Country) */
+.entitybar {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  background: var(--panel); border: 1px solid var(--rule); border-radius: 10px;
+  padding: 8px 12px; margin-bottom: 8px; box-shadow: var(--shadow);
+}
